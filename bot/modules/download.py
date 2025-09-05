@@ -144,7 +144,7 @@ async def start_link(link: str, user: dict, options: dict = None):
         if bot_set.tidal_legacy_enabled:
             await start_tidal(link, user)
         else:
-            await start_tidal_ng(user, link, user.get('bot_msg'))
+            await start_tidal_ng(link, user)
     elif link.startswith(tuple(deezer)):
         await start_deezer(link, user)
     elif link.startswith(tuple(qobuz)):
