@@ -17,13 +17,19 @@ import os
 import json
 
 
-@Client.on_message(filters.document & filters.private)
+# Custom filter to check if a user is in the tidal NG file import state
+async def is_awaiting_tidal_ng_file_filter(_, __, message: Message):
+    if not message.from_user:
+        return False
+    state = await conversation_state.get(message.from_user.id)
+    return state and state.get('name') == "awaiting_tidal_ng_file"
+
+# Apply the custom filter and set a high priority group (-1) to run before the default handlers
+@Client.on_message(filters.document & filters.private & filters.create(is_awaiting_tidal_ng_file_filter), group=-1)
 async def handle_tidal_ng_config_upload(c: Client, msg: Message):
     user_id = msg.from_user.id
     state = await conversation_state.get(user_id)
-
-    if not state or state.get('name') != "awaiting_tidal_ng_file":
-        return
+    # The state check is now handled by the filter, so we can remove it from here.
 
     if not msg.document:
         return
