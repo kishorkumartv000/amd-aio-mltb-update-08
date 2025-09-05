@@ -46,7 +46,7 @@ async def handle_tidal_ng_config_upload(c: Client, msg: Message):
     progress_msg = await c.send_message(user_id, f"Importing `{original_filename}`...")
     temp_path = None
     try:
-        temp_path = await msg.download_media()
+        temp_path = await c.download_media(msg)
         os.makedirs(target_dir, exist_ok=True)
         os.replace(temp_path, target_path)
         os.chmod(target_path, 0o666)
