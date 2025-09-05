@@ -614,13 +614,7 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
 
 
 async def extract_audio_metadata(file_path: str) -> dict:
-    """
-    Extract metadata from audio files
-    Args:
-        file_path: Path to audio file
-    Returns:
-        Metadata dictionary
-    """
+    """Extract metadata from audio files"""
     try:
         if file_path.endswith('.m4a'):
             audio = MP4(file_path)
@@ -628,17 +622,18 @@ async def extract_audio_metadata(file_path: str) -> dict:
                 'title': audio.get('\xa9nam', ['Unknown'])[0],
                 'artist': audio.get('\xa9ART', ['Unknown Artist'])[0],
                 'album': audio.get('\xa9alb', ['Unknown Album'])[0],
-                'duration': int(audio.info.length),
+                'duration': int(audio.info.length) if hasattr(audio, "info") else 0,
                 'thumbnail': extract_cover_art(audio, file_path) if getattr(bot_set, 'extract_embedded_cover', True) else None
             }
         else:
-            # Handle other audio formats like mp3, flac, etc.
             audio = mutagen.File(file_path)
+            if not audio:
+                return default_metadata(file_path)
             return {
-                'title': audio.get('title', ['Unknown'])[0],
-                'artist': audio.get('artist', ['Unknown Artist'])[0],
-                'album': audio.get('album', ['Unknown Album'])[0],
-                'duration': int(audio.info.length),
+                'title': audio.tags.get('title', ['Unknown'])[0] if hasattr(audio, "tags") else os.path.basename(file_path),
+                'artist': audio.tags.get('artist', ['Unknown Artist'])[0] if hasattr(audio, "tags") else "Unknown Artist",
+                'album': audio.tags.get('album', ['Unknown Album'])[0] if hasattr(audio, "tags") else "Unknown Album",
+                'duration': int(audio.info.length) if hasattr(audio, "info") else 0,
                 'thumbnail': (extract_cover_art(audio, file_path) if hasattr(audio, 'pictures') and getattr(bot_set, 'extract_embedded_cover', True) else None)
             }
     except Exception as e:
@@ -647,28 +642,22 @@ async def extract_audio_metadata(file_path: str) -> dict:
 
 
 async def extract_video_metadata(file_path: str) -> dict:
-    """
-    Extract metadata from video files
-    Args:
-        file_path: Path to video file
-    Returns:
-        Metadata dictionary with video-specific properties
-    """
+    """Extract metadata from video files"""
     try:
         if file_path.endswith(('.mp4', '.m4v', '.mov')):
             video = MP4(file_path)
             return {
                 'title': video.get('\xa9nam', ['Unknown'])[0],
                 'artist': video.get('\xa9ART', ['Unknown Artist'])[0],
-                'duration': int(video.info.length),
+                'duration': int(video.info.length) if hasattr(video, "info") else 0,
                 'thumbnail': extract_cover_art(video, file_path) if getattr(bot_set, 'extract_embedded_cover', True) else None,
-                'width': video.get('width', [1920])[0],
-                'height': video.get('height', [1080])[0]
+                'width': video.tags.get('width', [1920])[0] if hasattr(video, "tags") else 1920,
+                'height': video.tags.get('height', [1080])[0] if hasattr(video, "tags") else 1080
             }
         else:
             return default_metadata(file_path)
     except Exception as e:
-        LOGGER.error(f"Video metadata extraction failed: {str(e)}")
+        LOGGER.error(f"Video metadata extraction failed for {file_path}: {str(e)}")
         return default_metadata(file_path)
 
 
