@@ -117,6 +117,22 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         await asyncio.gather(log_progress(process.stdout, bot_msg, user), log_progress(process.stderr, bot_msg, user))
         await process.wait()
 
+        # --- DIAGNOSTIC LOGGING ---
+        LOGGER.info(f"Tidal-NG: Download process finished. Checking for files in path: {final_download_path}")
+        try:
+            ls_proc = await asyncio.create_subprocess_shell(
+                f"ls -lR '{final_download_path}'",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await ls_proc.communicate()
+            LOGGER.info(f"Tidal-NG: Directory listing for '{final_download_path}':\n{stdout.decode().strip()}")
+            if stderr:
+                LOGGER.error(f"Tidal-NG: Error listing directory: {stderr.decode().strip()}")
+        except Exception as ls_err:
+            LOGGER.error(f"Tidal-NG: Failed to list directory contents: {ls_err}")
+        # --- END DIAGNOSTIC LOGGING ---
+
         if process.returncode != 0:
             raise Exception("Tidal-NG download process failed.")
 
