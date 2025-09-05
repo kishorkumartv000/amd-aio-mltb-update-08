@@ -16,5 +16,6 @@ toml
 tidalapi
 dataclasses_json
 m3u8
+ffmpeg-python
 pycryptodome
 tidal-dl-ng
