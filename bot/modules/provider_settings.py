@@ -22,7 +22,7 @@ async def is_awaiting_tidal_ng_file_filter(_, __, message: Message):
     if not message.from_user:
         return False
     state = await conversation_state.get(message.from_user.id)
-    return state and state.get('name') == "awaiting_tidal_ng_file"
+    return state and state.get('stage') == "awaiting_tidal_ng_file"
 
 # Apply the custom filter and set a high priority group (-1) to run before the default handlers
 @Client.on_message(filters.document & filters.private & filters.create(is_awaiting_tidal_ng_file_filter), group=-1)
