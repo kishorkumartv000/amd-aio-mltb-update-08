@@ -40,17 +40,17 @@ class Logger:
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler)
 
-    def debug(self, message):
+    def debug(self, message, *args, **kwargs):
         caller_frame = inspect.currentframe().f_back
         caller_filename = os.path.basename(caller_frame.f_globals['__file__'])
-        self.logger.debug(f'{caller_filename} - {message}')
+        self.logger.debug(f'{caller_filename} - {message}', *args, **kwargs)
 
-    def info(self, message):
-        self.logger.info(message)
+    def info(self, message, *args, **kwargs):
+        self.logger.info(message, *args, **kwargs)
 
-    def error(self, message):
+    def error(self, message, *args, **kwargs):
         caller_frame = inspect.currentframe().f_back
         caller_filename = os.path.basename(caller_frame.f_globals['__file__'])
-        self.logger.error(f'{caller_filename} - {message}')
+        self.logger.error(f'{caller_filename} - {message}', *args, **kwargs)
 
 LOGGER = Logger()
