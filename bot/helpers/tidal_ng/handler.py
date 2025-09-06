@@ -51,6 +51,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
 
     try:
         # Read the user's settings file. If it doesn't exist, start with an empty dict.
+        # The user is responsible for creating it with the 'Execute cfg' button.
         try:
             with open(TIDAL_DL_NG_SETTINGS_PATH, "r") as f:
                 original_settings = json.load(f)

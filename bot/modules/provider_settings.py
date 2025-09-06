@@ -424,8 +424,7 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "🔹 `/tidal_ng_toggle <key>`\n"
             "🔹 `/tidal_ng_show`\n\n"
             "Use `/tidal_ng_config` for more help.\n\n"
-            "You can also use the button below to execute `cfg` and see the "
-            "current settings file, or to generate a new default one if it's missing."
+            "You can also use the buttons below for other actions."
         )
         buttons = [
             [
@@ -470,7 +469,6 @@ async def tidal_ng_execute_cfg_cb(c, cb: CallbackQuery):
             if not response_text:
                 response_text = "Command executed with no output."
 
-            # Create a back button to return to the Tidal NG settings menu
             back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
             await edit_message(msg, response_text, back_button)
 
