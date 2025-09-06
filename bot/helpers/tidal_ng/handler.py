@@ -83,36 +83,12 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
 
         os.makedirs(final_download_path, exist_ok=True)
 
-        # --- Apply Settings ---
+        # --- Apply Temporary Settings ---
+        # The user now controls the settings.json file directly via commands.
+        # We only need to inject the per-task download path and the ffmpeg path.
         new_settings = original_settings.copy()
         new_settings["download_base_path"] = final_download_path
-
-        def apply_user_setting(settings_dict, user_id, db_key, json_key, is_bool=False, is_int=False):
-            value_str = user_set_db.get_user_setting(user_id, db_key)
-            if value_str is not None:
-                value = value_str
-                if is_bool:
-                    value = value_str == "True"
-                elif is_int:
-                    try:
-                        value = int(value_str)
-                    except ValueError:
-                        return
-                settings_dict[json_key] = value
-                LOGGER.info(f"Applying user setting for {user_id}: {json_key} = {value}")
-
-        user_id = user.get("user_id")
-        if user_id:
-            apply_user_setting(new_settings, user_id, "tidal_ng_quality", "quality_audio")
-            apply_user_setting(new_settings, user_id, "tidal_ng_lyrics", "lyrics_embed", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_replay_gain", "metadata_replay_gain", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_lyrics_file", "lyrics_file", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_playlist_create", "playlist_create", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_cover_dim", "metadata_cover_dimension", is_int=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_video_quality", "quality_video")
-            apply_user_setting(new_settings, user_id, "tidal_ng_symlink", "symlink_to_track", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_video_convert", "video_convert_mp4", is_bool=True)
-            apply_user_setting(new_settings, user_id, "tidal_ng_video_download", "video_download", is_bool=True)
+        new_settings["path_binary_ffmpeg"] = "/usr/bin/ffmpeg"
 
         with open(TIDAL_DL_NG_SETTINGS_PATH, "w") as f:
             json.dump(new_settings, f, indent=4)
