@@ -144,7 +144,7 @@ async def tidal_ng_set(c: Client, msg: Message):
 
     data = _read_json(JSON_PATH)
     if not data:
-        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or the `Execute cfg` command first to generate it.")
+        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or use the 'Execute cfg' button first to generate it.")
         return
 
     _backup(JSON_PATH)
@@ -174,7 +174,7 @@ async def tidal_ng_toggle(c: Client, msg: Message):
 
     data = _read_json(JSON_PATH)
     if not data:
-        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or the `Execute cfg` command first to generate it.")
+        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or use the 'Execute cfg' button first to generate it.")
         return
 
     current_val = data.get(key, False)
@@ -197,7 +197,7 @@ async def tidal_ng_show(c: Client, msg: Message):
 
     data = _read_json(JSON_PATH)
     if not data:
-        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or the `Execute cfg` command first to generate it.")
+        await send_message(msg, f"Config file not found at {JSON_PATH}. Please run a download or use the 'Execute cfg' button first to generate it.")
         return
 
     keys_to_show = msg.text.split()[1:]
