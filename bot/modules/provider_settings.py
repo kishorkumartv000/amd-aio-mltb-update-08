@@ -423,11 +423,50 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "🔹 `/tidal_ng_set <key> <value>`\n"
             "🔹 `/tidal_ng_toggle <key>`\n"
             "🔹 `/tidal_ng_show`\n\n"
-            "Use `/tidal_ng_config` for more help."
+            "Use `/tidal_ng_config` for more help.\n\n"
+            "You can also use the button below to execute `cfg` and see the "
+            "current settings file, or to generate a new default one if it's missing."
         )
-        buttons = [[InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]]
+        buttons = [
+            [InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")],
+            [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
+        ]
         await edit_message(
             cb.message,
             text,
             InlineKeyboardMarkup(buttons)
         )
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidal_ng_execute_cfg$"))
+async def tidal_ng_execute_cfg_cb(c, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        from bot.helpers.tidal_ng.handler import TIDAL_DL_NG_CLI_PATH
+        msg = await edit_message(cb.message, "⚙️ Executing `tidal-dl-ng cfg`...")
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "python", TIDAL_DL_NG_CLI_PATH, "cfg",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            output = stdout.decode().strip()
+            error = stderr.decode().strip()
+
+            response_text = ""
+            if output:
+                response_text += f"**Output:**\n```{output}```\n\n"
+            if error:
+                response_text += f"**Errors:**\n```{error}```"
+
+            if not response_text:
+                response_text = "Command executed with no output."
+
+            # Create a back button to return to the Tidal NG settings menu
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
+            await edit_message(msg, response_text, back_button)
+
+        except Exception as e:
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
+            await edit_message(msg, f"❌ **An Error Occurred:**\n`{str(e)}`", back_button)

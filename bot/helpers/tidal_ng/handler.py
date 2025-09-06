@@ -50,26 +50,14 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
     is_temp_path = False
 
     try:
-        # --- One-time setup ---
-        if not os.path.exists(TIDAL_DL_NG_SETTINGS_PATH):
-            LOGGER.info("Tidal NG settings file not found. Running one-time setup...")
-            await edit_message(bot_msg, "Tidal NG not yet configured. Performing one-time setup...")
-            setup_cmd = ["python", TIDAL_DL_NG_CLI_PATH, "cfg"]
-            process = await asyncio.create_subprocess_exec(
-                *setup_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await process.communicate()
-            if process.returncode != 0:
-                raise Exception("Tidal NG one-time setup failed.")
-            LOGGER.info("Tidal NG one-time setup successful.")
-            await asyncio.sleep(1)
+        # Read the user's settings file. If it doesn't exist, start with an empty dict.
+        try:
+            with open(TIDAL_DL_NG_SETTINGS_PATH, "r") as f:
+                original_settings = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            original_settings = {}
 
-        with open(TIDAL_DL_NG_SETTINGS_PATH, "r") as f:
-            original_settings = json.load(f)
-
-        # --- Determine Download Path (smart contract: always via settings.json) ---
+        # --- Determine Download Path ---
         task_specific_path = os.path.join(
             Config.DOWNLOAD_BASE_DIR, str(user.get("user_id")), user.get("task_id")
         )

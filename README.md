@@ -136,36 +136,24 @@ Unlike the legacy provider which used a Python library directly, the Tidal NG ha
 
 ### Configuration & Settings
 
-The Tidal NG provider is highly configurable directly from the bot's settings menu. All settings are saved on a per-user basis.
+Configuration for the Tidal NG provider is now handled via direct commands, which gives you full, real-time control over the `settings.json` file. This is the same robust method used for the Apple Music provider.
 
--   **Accessing Settings**: Navigate to `/settings` -> `Provider Settings` -> `Tidal NG`. This will open the main settings panel, which is organized into the following sub-menus.
+-   **Accessing Settings**: Navigate to `/settings` -> `Provider Settings` -> `Tidal NG`.
+-   This menu provides a button to `Execute cfg`, which will display the tool's current configuration or generate a new default one if it's missing.
 
--   **Available Settings**:
-    -   **Audio Settings**:
-        -   `Audio Quality`: Choose your preferred audio quality (`LOW`, `HIGH`, `LOSSLESS`, `HI_RES_LOSSLESS`).
-        -   `Replay Gain`: Toggle whether to write replay gain information to metadata.
-    -   **Metadata Settings**:
-        -   `Embed Lyrics`: Toggle embedding lyrics into the audio file.
-        -   `Save Lyrics File`: Toggle saving lyrics to a separate `.lrc` file.
-        -   `Cover Art Dimension`: Choose the resolution for embedded cover art (`320px`, `640px`, `1280px`).
-    -   **File Settings**:
-        -   `Create .m3u8 Playlist`: Toggle the creation of a `.m3u8` playlist file for albums and playlists.
-        -   `Symlink to Track`: Toggle whether to download tracks to a central folder and create symlinks.
-    -   **Video Settings**:
-        -   `Download Videos`: Toggle whether to download videos at all.
-        -   `Convert Videos to MP4`: Toggle automatic conversion of video files to MP4.
-        -   `Video Quality`: Choose your preferred video download quality (`360p`, `480p`, `720p`, `1080p`).
-    -   **Login/Logout**: Manage your `tidal-dl-ng` session from the main panel.
-    -   **Import Config File**: For advanced users, this allows you to upload any configuration file (e.g., `token.json`, `settings.json`) directly into the Tidal NG configuration directories.
-        -   **How it works:** When you click the button, the bot will ask you to choose a destination:
-            -   **`main config (tidal_dl_ng)`**: Saves the file to `/root/.config/tidal_dl_ng/`. This is the standard directory used by the tool.
-            -   **`dev config (tidal_dl_ng-dev)`**: Saves the file to `/root/.config/tidal_dl_ng-dev/`. This can be used for development or testing purposes.
-        -   **Note:** If the chosen directory does not exist, the bot will ask for your permission to create it before proceeding. This feature provides a quick way to manage or update any custom configuration files for the `tidal-dl-ng` tool.
+### New Commands
 
--   **Download Path**: The download location is determined by a 3-level priority system:
-    1.  **Environment Variable (Highest Priority)**: If you set `TIDAL_NG_DOWNLOAD_PATH` in your `.env` file, it will be used for all downloads, overriding all other settings.
-    2.  **Imported Settings File**: If the environment variable is not set, the bot checks the `settings.json` you may have imported. If the `download_base_path` in that file is set to a custom value, the bot will respect it.
-    3.  **Bot Default (Lowest Priority)**: If neither of the above are set, the bot will create a unique directory for each task: `<DOWNLOAD_BASE_DIR>/<user_id>/<task_id>/`.
+-   `/tidal_ng_config` or `/tncfg`: Shows help and a list of example keys.
+-   `/tidal_ng_get <key>`: Shows the current value of a specific key in `settings.json`.
+-   `/tidal_ng_set <key> <value>`: Sets a key to a specific value. The bot will validate the input for known keys (e.g., ensuring booleans are `true`/`false`, values are integers, or choices are valid).
+-   `/tidal_ng_toggle <key>`: Toggles a boolean key between `true` and `false`.
+-   `/tidal_ng_show [keys...]`: Shows the entire `settings.json` file, or just the specified keys.
+
+This new system replaces the old, unreliable UI buttons and gives you complete control. As a result, the bot no longer uses any per-user settings from its own database for Tidal NG downloads; it relies entirely on the `settings.json` file that you manage with these commands.
+
+### Important Notes
+- **FFmpeg Path**: The bot will always forcefully set the `path_binary_ffmpeg` to `/usr/bin/ffmpeg` before every download to ensure video processing and FLAC extraction works reliably. You do not need to set this key yourself.
+- **Download Path**: The bot will always set the `download_base_path` to a temporary, per-task directory to ensure downloads do not conflict. The `TIDAL_NG_DOWNLOAD_PATH` environment variable can still be used to override this.
 
 ## Apple Wrapper Controls (Apple Music)
 
@@ -325,6 +313,12 @@ config_show - Show config values (or specific keys)
 config_get - Get a single config value
 config_set - Set a config value
 config_toggle - Toggle a boolean config value
+tidal_ng_config - Config help for Tidal NG JSON
+tncfg - Alias for tidal_ng_config
+tidal_ng_show - Show Tidal NG config values
+tidal_ng_get - Get a single Tidal NG config value
+tidal_ng_set - Set a Tidal NG config value
+tidal_ng_toggle - Toggle a boolean Tidal NG config value
 log - Get the bot log
 auth - Authorize a user or chat
 ban - Ban a user or chat
