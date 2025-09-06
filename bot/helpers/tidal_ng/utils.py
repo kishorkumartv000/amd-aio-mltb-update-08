@@ -6,8 +6,9 @@ SETTINGS_PATH = "/root/.config/tidal_dl_ng/settings.json"
 
 def get_tidal_ng_download_base_path() -> str:
     """
-    Safely read the current download_base_path from Tidal DL NG settings.json.
-    Always expands ~ and falls back to ~/download if something goes wrong.
+    Reads the current download_base_path from Tidal DL NG settings.json.
+    - Expands ~ to full user directory
+    - Falls back to ~/download if missing or error
     """
     try:
         with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
