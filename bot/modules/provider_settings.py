@@ -452,10 +452,8 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
             ],
             [
-                InlineKeyboardButton("FFmpeg Path: /usr/bin/ffmpeg", callback_data="tidal_ng_ffmpeg_info")
-            ],
-            [
-                InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile")
+                InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
+                InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
             ],
             [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
         ]
@@ -467,13 +465,39 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         )
 
 
-@Client.on_callback_query(filters.regex(pattern=r"^tidal_ng_ffmpeg_info$"))
-async def tidal_ng_ffmpeg_info_cb(c, cb: CallbackQuery):
+@Client.on_callback_query(filters.regex(pattern=r"^tidal_ng_execute_cfg$"))
+async def tidal_ng_execute_cfg_cb(c, cb: CallbackQuery):
     if await check_user(cb.from_user.id, restricted=True):
-        await cb.answer(
-            "The FFmpeg path is automatically set to /usr/bin/ffmpeg during downloads.",
-            show_alert=True
-        )
+        from bot.helpers.tidal_ng.handler import TIDAL_DL_NG_CLI_PATH
+        msg = await edit_message(cb.message, "⚙️ Executing `tidal-dl-ng cfg`...")
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "python", TIDAL_DL_NG_CLI_PATH, "cfg",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            output = stdout.decode().strip()
+            error = stderr.decode().strip()
+
+            response_text = ""
+            if output:
+                response_text += f"**Output:**\n```{output}```\n\n"
+            if error:
+                response_text += f"**Errors:**\n```{error}```"
+
+            if not response_text:
+                response_text = "Command executed with no output."
+
+            # Create a back button to return to the Tidal NG settings menu
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
+            await edit_message(msg, response_text, back_button)
+
+        except Exception as e:
+            back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
+            await edit_message(msg, f"❌ **An Error Occurred:**\n`{str(e)}`", back_button)
 
 
 # --- Conversation Handlers ---
