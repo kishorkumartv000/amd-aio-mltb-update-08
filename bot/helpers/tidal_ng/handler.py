@@ -3,6 +3,7 @@ import json
 import asyncio
 import shutil
 import re
+import time
 from pathlib import Path
 
 from config import Config
@@ -49,6 +50,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
     """
     bot_msg = user.get("bot_msg")
     original_settings = None
+    user_id = user.get("user_id")
 
     try:
         # --- Load original settings.json ---
@@ -58,15 +60,12 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         except (FileNotFoundError, json.JSONDecodeError):
             original_settings = {}
 
-        # --- Determine Download Path ---
-        if Config.TIDAL_NG_DOWNLOAD_PATH:
-            final_download_path = Path(Config.TIDAL_NG_DOWNLOAD_PATH)
-        elif original_settings.get("download_base_path") and original_settings["download_base_path"] != "~/download":
-            final_download_path = Path(os.path.expanduser(original_settings["download_base_path"]))
-        else:
-            # fallback to settings.json default
-            final_download_path = Path(get_tidal_ng_download_base_path())
-
+        # --- Determine Per-Request Download Path ---
+        # Use a dedicated job-specific directory to isolate each download, enabling clean zipping/Rclone flows.
+        content_id = get_content_id_from_url(link) or "unknown"
+        job_tag = content_id if content_id != "unknown" else str(int(time.time()))
+        job_root = Path(Config.LOCAL_STORAGE) / str(user_id) / "Tidal_NG"
+        final_download_path = job_root / job_tag
         final_download_path.mkdir(parents=True, exist_ok=True)
 
         # --- Apply Temporary Settings ---
@@ -94,8 +93,8 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         if process.returncode != 0:
             raise Exception("Tidal-NG download process failed.")
 
-        # --- Always re-read path from settings.json after download ---
-        final_download_path = Path(get_tidal_ng_download_base_path())
+        # --- Keep using the isolated job directory as the working folder ---
+        final_download_path = Path(new_settings.get("download_base_path", str(final_download_path)))
         LOGGER.info(f"Tidal-NG: Using download path {final_download_path}")
 
         # --- Collect Files ---
