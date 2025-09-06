@@ -1,8 +1,10 @@
 import os
+from config import Config
 
 from ..settings import bot_set
 from .message import send_message, edit_message
 from .utils import *
+from .uploader import rclone_upload as modern_rclone_upload, _post_rclone_manage_button
 
 #
 #
@@ -16,9 +18,11 @@ async def track_upload(metadata, user, disable_link=False):
     elif bot_set.upload_mode == 'Telegram':
         await telegram_upload(metadata, user)
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['filepath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['filepath'])
         if not disable_link:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     try:
         os.remove(metadata['filepath'])
@@ -39,7 +43,7 @@ async def album_upload(metadata, user):
         else:
             await batch_telegram_upload(metadata, user)
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
         if metadata['poster_msg']:
             try:
                 await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.ALBUM_TEMPLATE, metadata, user))
@@ -47,6 +51,8 @@ async def album_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -63,7 +69,7 @@ async def artist_upload(metadata, user):
         else:
             pass # artist telegram uploads are handled by album fucntion
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
         if metadata['poster_msg']:
             try:
                 await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.ARTIST_TEMPLATE, metadata, user))
@@ -71,6 +77,8 @@ async def artist_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -90,17 +98,25 @@ async def playlist_upload(metadata, user):
     else:
         if bot_set.playlist_sort and not bot_set.playlist_zip:
             if bot_set.disable_sort_link:
-                await rclone_upload(user, f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/")
+                # Upload the whole base folder; ignore returned links
+                try:
+                    _, _, remote_info = await rclone_upload(user, f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/")
+                    if remote_info:
+                        await _post_rclone_manage_button(user, remote_info)
+                except Exception:
+                    pass
             else:
                 for track in metadata['tracks']:
                     try:
-                        rclone_link, index_link = await rclone_upload(user, track['filepath'])
+                        rclone_link, index_link, remote_info = await rclone_upload(user, track['filepath'])
                         if not bot_set.disable_sort_link:
                             await post_simple_message(user, track, rclone_link, index_link)
+                        if remote_info:
+                            await _post_rclone_manage_button(user, remote_info)
                     except ValueError: # might try to upload track which is not available
                         pass
         else:
-            rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+            rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
             if metadata['poster_msg']:
                 try:
                     await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.PLAYLIST_TEMPLATE, metadata, user))
@@ -108,6 +124,8 @@ async def playlist_upload(metadata, user):
                     pass
             else:
                 await post_simple_message(user, metadata, rclone_link, index_link)
+            if remote_info:
+                await _post_rclone_manage_button(user, remote_info)
 
 #
 #
@@ -117,18 +135,11 @@ async def playlist_upload(metadata, user):
 
 async def rclone_upload(user, realpath):
     """
-    Args:
-        user: user details
-        realpath: full path to (not used for uploading)
-    Returns:
-        rclone_link, index_link
+    Delegate Rclone upload to the modern uploader with copy scope support and manage button context.
+    Returns: (rclone_link, index_link, remote_info)
     """
-    path = f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/"
-    cmd = f'rclone copy --config ./rclone.conf "{path}" "{Config.RCLONE_DEST}"'
-    task = await asyncio.create_subprocess_shell(cmd)
-    await task.wait()
-    r_link, i_link = await create_link(realpath, Config.DOWNLOAD_BASE_DIR + f"/{user['r_id']}/")
-    return r_link, i_link
+    base_path = f"{Config.LEGACY_DOWNLOAD_BASE_DIR}/{user['r_id']}/"
+    return await modern_rclone_upload(user, realpath, base_path)
 
 
 async def local_upload(metadata, user):
