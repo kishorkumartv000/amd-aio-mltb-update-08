@@ -445,7 +445,7 @@ async def toggle_extract_cover_cb(client, cb:CallbackQuery):
         except:
             pass
 
-@Client.on_callback_query(filters.regex(pattern=r"^linkOption"))
+@Client.on_callback_query(filters.regex(pattern=r"^linkOptions$"))
 async def link_option_cb(client, cb:CallbackQuery):
     if await check_user(cb.from_user.id, restricted=True):
         options = ['False', 'Index', 'RCLONE', 'Both']
