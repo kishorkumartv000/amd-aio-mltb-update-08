@@ -1,10 +1,11 @@
 import os
+import asyncio
 from config import Config
 
 from ..settings import bot_set
 from .message import send_message, edit_message
 from .utils import *
-from .uploader import rclone_upload as modern_rclone_upload, _post_rclone_manage_button
+from .uploader import _post_rclone_manage_button
 
 #
 #
@@ -135,11 +136,88 @@ async def playlist_upload(metadata, user):
 
 async def rclone_upload(user, realpath):
     """
-    Delegate Rclone upload to the modern uploader with copy scope support and manage button context.
+    Legacy Rclone uploader with copy scope (FILE/FOLDER), link generation, and manage context.
     Returns: (rclone_link, index_link, remote_info)
     """
-    base_path = f"{Config.LEGACY_DOWNLOAD_BASE_DIR}/{user['r_id']}/"
-    return await modern_rclone_upload(user, realpath, base_path)
+    # Preserve legacy base path usage for relative computations
+    base_path = f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/"
+
+    def _compute_relative(p: str, base: str | None) -> str:
+        try:
+            p_abs = os.path.abspath(p)
+            if base:
+                base_abs = os.path.abspath(base)
+                if p_abs.startswith(base_abs):
+                    return os.path.relpath(p_abs, base_abs)
+        except Exception:
+            pass
+        return os.path.basename(p_abs) if os.path.isfile(p_abs) else os.path.basename(os.path.normpath(p_abs))
+
+    dest_root = Config.RCLONE_DEST
+    abs_path = os.path.abspath(realpath)
+    is_directory = os.path.isdir(abs_path)
+    scope = getattr(bot_set, 'rclone_copy_scope', 'FILE').upper()
+
+    if scope == 'FOLDER':
+        if is_directory:
+            source_for_copy = abs_path
+            relative_path = _compute_relative(abs_path, base_path)
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+        else:
+            parent_dir_abs = os.path.dirname(abs_path)
+            source_for_copy = parent_dir_abs
+            relative_path = _compute_relative(parent_dir_abs, base_path)
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+            is_directory = True
+    else:  # FILE scope
+        relative_path = _compute_relative(abs_path, base_path)
+        if is_directory:
+            source_for_copy = abs_path
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+        else:
+            parent_dir = os.path.dirname(relative_path)
+            source_for_copy = abs_path
+            dest_path = f"{dest_root}/{parent_dir}".rstrip("/")
+
+    copy_cmd = f'rclone copy --config ./rclone.conf "{source_for_copy}" "{dest_path}"'
+    task = await asyncio.create_subprocess_shell(
+        copy_cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await task.communicate()
+    if task.returncode != 0:
+        try:
+            LOGGER.debug(f"Rclone copy failed: {stderr.decode().strip()}")
+        except Exception:
+            pass
+        return None, None, None
+
+    # Generate links using legacy helper
+    r_link, i_link = await create_link(realpath, base_path)
+
+    # Build manage context compatible with modern manage UI
+    remote_name = ''
+    remote_base = ''
+    try:
+        if dest_root and ':' in dest_root:
+            remote_name, remote_base = dest_root.split(':', 1)
+            remote_base = remote_base.strip('/')
+        else:
+            remote_name = (dest_root or '').rstrip(':')
+            remote_base = ''
+    except Exception:
+        remote_name = (dest_root or '').rstrip(':')
+        remote_base = ''
+
+    remote_info = {
+        'remote': remote_name,
+        'base': remote_base,
+        'path': relative_path,
+        'is_dir': is_directory
+    }
+
+    return r_link, i_link, remote_info
 
 
 async def local_upload(metadata, user):
