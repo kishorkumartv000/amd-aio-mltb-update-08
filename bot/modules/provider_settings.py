@@ -452,6 +452,9 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
             ],
             [
+                InlineKeyboardButton("FFmpeg Path: /usr/bin/ffmpeg", callback_data="tidal_ng_ffmpeg_info")
+            ],
+            [
                 InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile")
             ],
             [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
@@ -462,6 +465,16 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "Configure your download settings for the Tidal NG provider.",
             InlineKeyboardMarkup(buttons)
         )
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidal_ng_ffmpeg_info$"))
+async def tidal_ng_ffmpeg_info_cb(c, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        await cb.answer(
+            "The FFmpeg path is automatically set to /usr/bin/ffmpeg during downloads.",
+            show_alert=True
+        )
+
 
 # --- Conversation Handlers ---
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNg_importFile$"))

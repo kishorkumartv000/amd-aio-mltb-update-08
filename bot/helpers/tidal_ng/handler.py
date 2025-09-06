@@ -86,6 +86,8 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         # --- Apply Settings ---
         new_settings = original_settings.copy()
         new_settings["download_base_path"] = final_download_path
+        # Set the FFmpeg binary path
+        new_settings["path_binary_ffmpeg"] = "/usr/bin/ffmpeg"
 
         def apply_user_setting(settings_dict, user_id, db_key, json_key, is_bool=False, is_int=False):
             value_str = user_set_db.get_user_setting(user_id, db_key)
