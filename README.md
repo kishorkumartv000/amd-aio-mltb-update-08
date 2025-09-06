@@ -139,17 +139,21 @@ Unlike the legacy provider which used a Python library directly, the Tidal NG ha
 Configuration for the Tidal NG provider is now handled via direct commands, which gives you full, real-time control over the `settings.json` file. This is the same robust method used for the Apple Music provider.
 
 -   **Accessing Settings**: Navigate to `/settings` -> `Provider Settings` -> `Tidal NG`.
--   This menu provides a button to `Execute cfg`, which will display the tool's current configuration or generate a new default one if it's missing.
+-   This menu provides important action buttons and explains how to use the new command-based system.
 
-### New Commands
+-   **Utility Buttons**:
+    -   `🔑 Login` / `🚨 Logout`: Manage your `tidal-dl-ng` session.
+    -   `📂 Import Config File`: For advanced users, this allows you to upload configuration files (e.g., `token.json`) directly into the Tidal NG configuration directory.
+    -   `⚙️ Execute cfg`: Displays the tool's current configuration or generates a new default one if it's missing. This is useful for seeing all available keys.
 
--   `/tidal_ng_config` or `/tncfg`: Shows help and a list of example keys.
--   `/tidal_ng_get <key>`: Shows the current value of a specific key in `settings.json`.
--   `/tidal_ng_set <key> <value>`: Sets a key to a specific value. The bot will validate the input for known keys (e.g., ensuring booleans are `true`/`false`, values are integers, or choices are valid).
--   `/tidal_ng_toggle <key>`: Toggles a boolean key between `true` and `false`.
--   `/tidal_ng_show [keys...]`: Shows the entire `settings.json` file, or just the specified keys.
+-   **New Commands for Real-time Control**:
+    -   `/tidal_ng_config` or `/tncfg`: Shows help and a list of example keys.
+    -   `/tidal_ng_get <key>`: Shows the current value of a specific key in `settings.json`.
+    -   `/tidal_ng_set <key> <value>`: Sets a key to a specific value. The bot will validate the input for known keys.
+    -   `/tidal_ng_toggle <key>`: Toggles a boolean key between `true` and `false`.
+    -   `/tidal_ng_show [keys...]`: Shows the entire `settings.json` file, or just the specified keys.
 
-This new system replaces the old, unreliable UI buttons and gives you complete control. As a result, the bot no longer uses any per-user settings from its own database for Tidal NG downloads; it relies entirely on the `settings.json` file that you manage with these commands.
+This new system replaces the old, non-functional UI buttons and gives you complete control. As a result, the bot no longer uses any per-user settings from its own database for Tidal NG downloads; it relies entirely on the `settings.json` file that you manage with these commands.
 
 ### Important Notes
 - **FFmpeg Path**: The bot will always forcefully set the `path_binary_ffmpeg` to `/usr/bin/ffmpeg` before every download to ensure video processing and FLAC extraction works reliably. You do not need to set this key yourself.
