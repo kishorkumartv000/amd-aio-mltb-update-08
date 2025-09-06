@@ -3,7 +3,6 @@ import json
 import asyncio
 import shutil
 import re
-import time
 from pathlib import Path
 
 from config import Config
@@ -60,21 +59,9 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         except (FileNotFoundError, json.JSONDecodeError):
             original_settings = {}
 
-        # --- Determine Per-Request Download Path ---
-        # Use a dedicated job-specific directory to isolate each download, enabling clean zipping/Rclone flows.
-        content_id = get_content_id_from_url(link) or "unknown"
-        job_tag = content_id if content_id != "unknown" else str(int(time.time()))
-        job_root = Path(Config.LOCAL_STORAGE) / str(user_id) / "Tidal_NG"
-        final_download_path = job_root / job_tag
+        # --- Determine Download Path from user's settings.json ---
+        final_download_path = Path(get_tidal_ng_download_base_path())
         final_download_path.mkdir(parents=True, exist_ok=True)
-
-        # --- Apply Temporary Settings ---
-        new_settings = original_settings.copy()
-        new_settings["download_base_path"] = str(final_download_path)
-        new_settings["path_binary_ffmpeg"] = "/usr/bin/ffmpeg"
-
-        with open(TIDAL_DL_NG_SETTINGS_PATH, "w") as f:
-            json.dump(new_settings, f, indent=4)
 
         # --- Execute Download ---
         await edit_message(bot_msg, "🚀 Starting Tidal NG download...")
@@ -93,8 +80,8 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         if process.returncode != 0:
             raise Exception("Tidal-NG download process failed.")
 
-        # --- Keep using the isolated job directory as the working folder ---
-        final_download_path = Path(new_settings.get("download_base_path", str(final_download_path)))
+        # --- Re-resolve download path from settings.json (in case user changed it) ---
+        final_download_path = Path(get_tidal_ng_download_base_path())
         LOGGER.info(f"Tidal-NG: Using download path {final_download_path}")
 
         # --- Collect Files ---
@@ -155,7 +142,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             content_id=content_id,
             title=upload_meta["title"],
             artist=upload_meta["artist"],
-            quality=new_settings.get("quality_audio", "N/A"),
+            quality=original_settings.get("quality_audio", "N/A"),
         )
 
         # --- Upload ---
