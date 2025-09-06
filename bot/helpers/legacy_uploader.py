@@ -1,8 +1,11 @@
 import os
+import asyncio
+from config import Config
 
 from ..settings import bot_set
 from .message import send_message, edit_message
 from .utils import *
+from .uploader import _post_rclone_manage_button
 
 #
 #
@@ -16,9 +19,11 @@ async def track_upload(metadata, user, disable_link=False):
     elif bot_set.upload_mode == 'Telegram':
         await telegram_upload(metadata, user)
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['filepath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['filepath'])
         if not disable_link:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     try:
         os.remove(metadata['filepath'])
@@ -39,7 +44,7 @@ async def album_upload(metadata, user):
         else:
             await batch_telegram_upload(metadata, user)
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
         if metadata['poster_msg']:
             try:
                 await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.ALBUM_TEMPLATE, metadata, user))
@@ -47,6 +52,8 @@ async def album_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -63,7 +70,7 @@ async def artist_upload(metadata, user):
         else:
             pass # artist telegram uploads are handled by album fucntion
     else:
-        rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+        rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
         if metadata['poster_msg']:
             try:
                 await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.ARTIST_TEMPLATE, metadata, user))
@@ -71,6 +78,8 @@ async def artist_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -90,17 +99,25 @@ async def playlist_upload(metadata, user):
     else:
         if bot_set.playlist_sort and not bot_set.playlist_zip:
             if bot_set.disable_sort_link:
-                await rclone_upload(user, f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/")
+                # Upload the whole base folder; ignore returned links
+                try:
+                    _, _, remote_info = await rclone_upload(user, f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/")
+                    if remote_info:
+                        await _post_rclone_manage_button(user, remote_info)
+                except Exception:
+                    pass
             else:
                 for track in metadata['tracks']:
                     try:
-                        rclone_link, index_link = await rclone_upload(user, track['filepath'])
+                        rclone_link, index_link, remote_info = await rclone_upload(user, track['filepath'])
                         if not bot_set.disable_sort_link:
                             await post_simple_message(user, track, rclone_link, index_link)
+                        if remote_info:
+                            await _post_rclone_manage_button(user, remote_info)
                     except ValueError: # might try to upload track which is not available
                         pass
         else:
-            rclone_link, index_link = await rclone_upload(user, metadata['folderpath'])
+            rclone_link, index_link, remote_info = await rclone_upload(user, metadata['folderpath'])
             if metadata['poster_msg']:
                 try:
                     await edit_art_poster(metadata, user, rclone_link, index_link, await format_string(lang.s.PLAYLIST_TEMPLATE, metadata, user))
@@ -108,6 +125,8 @@ async def playlist_upload(metadata, user):
                     pass
             else:
                 await post_simple_message(user, metadata, rclone_link, index_link)
+            if remote_info:
+                await _post_rclone_manage_button(user, remote_info)
 
 #
 #
@@ -117,18 +136,88 @@ async def playlist_upload(metadata, user):
 
 async def rclone_upload(user, realpath):
     """
-    Args:
-        user: user details
-        realpath: full path to (not used for uploading)
-    Returns:
-        rclone_link, index_link
+    Legacy Rclone uploader with copy scope (FILE/FOLDER), link generation, and manage context.
+    Returns: (rclone_link, index_link, remote_info)
     """
-    path = f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/"
-    cmd = f'rclone copy --config ./rclone.conf "{path}" "{Config.RCLONE_DEST}"'
-    task = await asyncio.create_subprocess_shell(cmd)
-    await task.wait()
-    r_link, i_link = await create_link(realpath, Config.DOWNLOAD_BASE_DIR + f"/{user['r_id']}/")
-    return r_link, i_link
+    # Preserve legacy base path usage for relative computations
+    base_path = f"{Config.DOWNLOAD_BASE_DIR}/{user['r_id']}/"
+
+    def _compute_relative(p: str, base: str | None) -> str:
+        try:
+            p_abs = os.path.abspath(p)
+            if base:
+                base_abs = os.path.abspath(base)
+                if p_abs.startswith(base_abs):
+                    return os.path.relpath(p_abs, base_abs)
+        except Exception:
+            pass
+        return os.path.basename(p_abs) if os.path.isfile(p_abs) else os.path.basename(os.path.normpath(p_abs))
+
+    dest_root = Config.RCLONE_DEST
+    abs_path = os.path.abspath(realpath)
+    is_directory = os.path.isdir(abs_path)
+    scope = getattr(bot_set, 'rclone_copy_scope', 'FILE').upper()
+
+    if scope == 'FOLDER':
+        if is_directory:
+            source_for_copy = abs_path
+            relative_path = _compute_relative(abs_path, base_path)
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+        else:
+            parent_dir_abs = os.path.dirname(abs_path)
+            source_for_copy = parent_dir_abs
+            relative_path = _compute_relative(parent_dir_abs, base_path)
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+            is_directory = True
+    else:  # FILE scope
+        relative_path = _compute_relative(abs_path, base_path)
+        if is_directory:
+            source_for_copy = abs_path
+            dest_path = f"{dest_root}/{relative_path}".rstrip("/")
+        else:
+            parent_dir = os.path.dirname(relative_path)
+            source_for_copy = abs_path
+            dest_path = f"{dest_root}/{parent_dir}".rstrip("/")
+
+    copy_cmd = f'rclone copy --config ./rclone.conf "{source_for_copy}" "{dest_path}"'
+    task = await asyncio.create_subprocess_shell(
+        copy_cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await task.communicate()
+    if task.returncode != 0:
+        try:
+            LOGGER.debug(f"Rclone copy failed: {stderr.decode().strip()}")
+        except Exception:
+            pass
+        return None, None, None
+
+    # Generate links using legacy helper
+    r_link, i_link = await create_link(realpath, base_path)
+
+    # Build manage context compatible with modern manage UI
+    remote_name = ''
+    remote_base = ''
+    try:
+        if dest_root and ':' in dest_root:
+            remote_name, remote_base = dest_root.split(':', 1)
+            remote_base = remote_base.strip('/')
+        else:
+            remote_name = (dest_root or '').rstrip(':')
+            remote_base = ''
+    except Exception:
+        remote_name = (dest_root or '').rstrip(':')
+        remote_base = ''
+
+    remote_info = {
+        'remote': remote_name,
+        'base': remote_base,
+        'path': relative_path,
+        'is_dir': is_directory
+    }
+
+    return r_link, i_link, remote_info
 
 
 async def local_upload(metadata, user):
