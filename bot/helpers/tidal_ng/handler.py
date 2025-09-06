@@ -1,8 +1,12 @@
 import os
 import json
 import asyncio
+import shutil
+import re
+from pathlib import Path
+
 from config import Config
-from ..message import edit_message
+from ..message import edit_message, send_message
 from bot.logger import LOGGER
 from ..database.pg_impl import download_history
 from bot.helpers.utils import (
@@ -11,23 +15,22 @@ from bot.helpers.utils import (
 )
 from bot.helpers.uploader import track_upload, album_upload, playlist_upload, music_video_upload
 from bot.helpers.tidal_ng.utils import get_tidal_ng_download_base_path
-import re
 
-# Path to the tidal-dl-ng CLI script
+# Define the path to the tidal-dl-ng CLI script
 TIDAL_DL_NG_CLI_PATH = "/usr/src/app/tidal-dl-ng/tidal_dl_ng/cli.py"
-# Path to the settings.json used by tidal-dl-ng
+# Define the path to the settings.json for the CLI tool
 TIDAL_DL_NG_SETTINGS_PATH = "/root/.config/tidal_dl_ng/settings.json"
 
 
-async def log_progress(stream, bot_msg):
+async def log_progress(stream, bot_msg, user):
     """Reads a stream (stdout/stderr) from the subprocess and updates the Telegram message."""
     while True:
         line = await stream.readline()
         if not line:
             break
-        output = line.decode("utf-8", errors="ignore").strip()
+        output = line.decode("utf-8").strip()
+        LOGGER.info(f"[TidalDL-NG] {output}")
         if output:
-            LOGGER.info(f"[TidalDL-NG] {output}")
             try:
                 await edit_message(bot_msg, f"```\n{output}\n```")
             except Exception:
@@ -42,12 +45,38 @@ def get_content_id_from_url(url: str) -> str:
 
 async def start_tidal_ng(link: str, user: dict, options: dict = None):
     """
-    Handles downloads using the tidal-dl-ng CLI tool, then uploads the result.
-    Respects ONLY the downloadPath defined in ~/.config/tidal_dl_ng/settings.json.
+    Handles downloads using the tidal-dl-ng CLI tool, and then uploads the result.
     """
     bot_msg = user.get("bot_msg")
+    original_settings = None
 
     try:
+        # --- Load original settings.json ---
+        try:
+            with open(TIDAL_DL_NG_SETTINGS_PATH, "r") as f:
+                original_settings = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            original_settings = {}
+
+        # --- Determine Download Path ---
+        if Config.TIDAL_NG_DOWNLOAD_PATH:
+            final_download_path = Path(Config.TIDAL_NG_DOWNLOAD_PATH)
+        elif original_settings.get("download_base_path") and original_settings["download_base_path"] != "~/download":
+            final_download_path = Path(os.path.expanduser(original_settings["download_base_path"]))
+        else:
+            # fallback to settings.json default
+            final_download_path = Path(get_tidal_ng_download_base_path())
+
+        final_download_path.mkdir(parents=True, exist_ok=True)
+
+        # --- Apply Temporary Settings ---
+        new_settings = original_settings.copy()
+        new_settings["download_base_path"] = str(final_download_path)
+        new_settings["path_binary_ffmpeg"] = "/usr/bin/ffmpeg"
+
+        with open(TIDAL_DL_NG_SETTINGS_PATH, "w") as f:
+            json.dump(new_settings, f, indent=4)
+
         # --- Execute Download ---
         await edit_message(bot_msg, "🚀 Starting Tidal NG download...")
         cmd = ["python", TIDAL_DL_NG_CLI_PATH, "dl", link]
@@ -57,20 +86,17 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             stderr=asyncio.subprocess.PIPE,
         )
         await asyncio.gather(
-            log_progress(process.stdout, bot_msg),
-            log_progress(process.stderr, bot_msg),
+            log_progress(process.stdout, bot_msg, user),
+            log_progress(process.stderr, bot_msg, user),
         )
         await process.wait()
 
         if process.returncode != 0:
             raise Exception("Tidal-NG download process failed.")
 
-        # --- Resolve final download path from settings.json ---
-        final_download_path = get_tidal_ng_download_base_path()
+        # --- Always re-read path from settings.json after download ---
+        final_download_path = Path(get_tidal_ng_download_base_path())
         LOGGER.info(f"Tidal-NG: Using download path {final_download_path}")
-
-        if not final_download_path.exists():
-            raise Exception(f"Download path not found: {final_download_path}")
 
         # --- Collect Files ---
         await edit_message(bot_msg, "📥 Download complete. Processing files...")
@@ -86,7 +112,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         items = []
         for file_path in downloaded_files:
             try:
-                if file_path.lower().endswith((".mp4", ".m4v", ".mov", ".mkv")):
+                if file_path.lower().endswith((".mp4", ".m4v")):
                     metadata = await extract_video_metadata(file_path)
                 else:
                     metadata = await extract_audio_metadata(file_path)
@@ -106,7 +132,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
                 content_type = "album"
             else:
                 content_type = "playlist"
-        elif items[0]["filepath"].lower().endswith((".mp4", ".m4v", ".mov", ".mkv")):
+        elif items[0]["filepath"].lower().endswith((".mp4", ".m4v")):
             content_type = "video"
 
         # --- Prepare Metadata for Uploader ---
@@ -130,7 +156,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             content_id=content_id,
             title=upload_meta["title"],
             artist=upload_meta["artist"],
-            quality="N/A",
+            quality=new_settings.get("quality_audio", "N/A"),
         )
 
         # --- Upload ---
@@ -146,3 +172,12 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
     except Exception as e:
         LOGGER.error(f"An error occurred in start_tidal_ng: {e}", exc_info=True)
         await edit_message(bot_msg, f"❌ **Fatal Error:** {e}")
+
+    finally:
+        if original_settings:
+            try:
+                with open(TIDAL_DL_NG_SETTINGS_PATH, "w") as f:
+                    json.dump(original_settings, f, indent=4)
+                LOGGER.info("Tidal-NG settings.json restored to original state.")
+            except Exception as e:
+                LOGGER.error(f"Failed to restore Tidal-NG settings.json: {e}")
