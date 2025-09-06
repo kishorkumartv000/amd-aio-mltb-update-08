@@ -155,7 +155,9 @@ The Tidal NG provider is highly configurable directly from the bot's settings me
         -   `Download Videos`: Toggle whether to download videos at all.
         -   `Convert Videos to MP4`: Toggle automatic conversion of video files to MP4.
         -   `Video Quality`: Choose your preferred video download quality (`360p`, `480p`, `720p`, `1080p`).
-    -   **Login/Logout**: Manage your `tidal-dl-ng` session from the main panel.
+    -   **Technical Settings**:
+        -   `FFmpeg Path`: This is an informational button that displays the path to the FFmpeg binary used for conversions. The path is automatically set by the bot to `/usr/bin/ffmpeg` to ensure reliability and is not user-configurable.
+    -   **Login/Logout**: Manage your `tidal-dl_ng` session from the main panel.
     -   **Import Config File**: For advanced users, this allows you to upload any configuration file (e.g., `token.json`, `settings.json`) directly into the Tidal NG configuration directories.
         -   **How it works:** When you click the button, the bot will ask you to choose a destination:
             -   **`main config (tidal_dl_ng)`**: Saves the file to `/root/.config/tidal_dl_ng/`. This is the standard directory used by the tool.
