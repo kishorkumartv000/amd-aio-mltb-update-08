@@ -428,7 +428,14 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "current settings file, or to generate a new default one if it's missing."
         )
         buttons = [
-            [InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")],
+            [
+                InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),
+                InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
+            ],
+            [
+                InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
+                InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
+            ],
             [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
         ]
         await edit_message(
@@ -470,3 +477,208 @@ async def tidal_ng_execute_cfg_cb(c, cb: CallbackQuery):
         except Exception as e:
             back_button = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
             await edit_message(msg, f"❌ **An Error Occurred:**\n`{str(e)}`", back_button)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNg_importFile$"))
+async def tidal_ng_import_file_cb(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    buttons = [
+        [InlineKeyboardButton("main config (`tidal_dl_ng`)", callback_data="tidalNg_setImportDir|main")],
+        [InlineKeyboardButton("dev config (`tidal_dl_ng-dev`)", callback_data="tidalNg_setImportDir|dev")],
+        [InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]
+    ]
+    await edit_message(
+        cb.message,
+        "Please choose the destination directory for your configuration file.",
+        InlineKeyboardMarkup(buttons)
+    )
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNg_setImportDir\|"))
+async def tidal_ng_set_import_dir_cb(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    choice = cb.data.split("|")[1]
+    if choice == "main":
+        target_dir = "/root/.config/tidal_dl_ng/"
+    else:
+        target_dir = "/root/.config/tidal_dl_ng-dev/"
+
+    if not os.path.exists(target_dir):
+        await edit_message(
+            cb.message,
+            f"The destination directory (`{target_dir}`) does not exist. Shall I create it for you?",
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Yes, create it", callback_data=f"tidalNg_createDir|{choice}")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="tidalNgP")]
+            ])
+        )
+    else:
+        await conversation_state.clear(cb.from_user.id)
+        await conversation_state.start(cb.from_user.id, "awaiting_tidal_ng_file", {"target_dir": target_dir})
+        await edit_message(
+            cb.message,
+            "Please upload the file you want to import. You can /cancel anytime.",
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ Cancel", callback_data="tidalNgP")]
+            ])
+        )
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNg_createDir\|"))
+async def tidal_ng_create_dir_cb(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    choice = cb.data.split("|")[1]
+    if choice == "main":
+        target_dir = "/root/.config/tidal_dl_ng/"
+    else:
+        target_dir = "/root/.config/tidal_dl_ng-dev/"
+
+    try:
+        os.makedirs(target_dir, mode=0o777, exist_ok=True)
+        await cb.answer("Directory created successfully!", show_alert=False)
+        # Now ask for the file
+        await conversation_state.clear(cb.from_user.id)
+        await conversation_state.start(cb.from_user.id, "awaiting_tidal_ng_file", {"target_dir": target_dir})
+        await edit_message(
+            cb.message,
+            "Please upload the file you want to import. You can /cancel anytime.",
+            InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="tidalNgP")]])
+        )
+    except Exception as e:
+        await edit_message(
+            cb.message,
+            f"❌ **Failed to create directory:**\n`{str(e)}`",
+            InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]])
+        )
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgLogin"))
+async def tidal_ng_login_cb(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    msg = await edit_message(
+        cb.message,
+        "⏳ **Attempting to log in to Tidal DL NG...**\n\n"
+        "Please wait while the bot starts the login process."
+    )
+
+    try:
+        command = "env PYTHONPATH=/usr/src/app/tidal-dl-ng python cli.py login"
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd='/usr/src/app/tidal-dl-ng/tidal_dl_ng'
+        )
+
+        # Timeout for the entire login process
+        try:
+            # We will read stdout line by line
+            url_found = False
+            while True:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=305.0)
+                if not line:
+                    break
+
+                output = line.decode().strip()
+                if "https://link.tidal.com/" in output:
+                    url_found = True
+                    await edit_message(
+                        msg,
+                        f"🔗 **Login URL Detected**\n\n"
+                        f"Please visit the following URL to log in. The code will expire in 5 minutes.\n\n"
+                        f"`{output}`\n\n"
+                        f"The bot is waiting for you to complete the login...",
+                    )
+
+                if "The login was successful" in output:
+                    await edit_message(
+                        msg,
+                        f"✅ **Login Successful!**\n\n"
+                        f"Your Tidal DL NG credentials have been stored."
+                    )
+                    await process.wait() # ensure process is finished
+                    return
+
+            # If loop breaks and we haven't returned, something went wrong
+            stderr_output = await process.stderr.read()
+            err_msg = stderr_output.decode().strip()
+            await edit_message(
+                msg,
+                f"❌ **Login Failed**\n\n"
+                f"The login process failed. Please try again.\n\n"
+                f"**Error:**\n`{err_msg or 'No error message from script.'}`"
+            )
+
+        except asyncio.TimeoutError:
+            process.kill()
+            await edit_message(
+                msg,
+                "❌ **Login Timed Out**\n\n"
+                "You did not complete the login within 5 minutes. Please try again."
+            )
+
+    except Exception as e:
+        await edit_message(
+            msg,
+            f"❌ **An Error Occurred**\n\n"
+            f"An unexpected error occurred while trying to log in.\n\n"
+            f"`{str(e)}`"
+        )
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgLogout"))
+async def tidal_ng_logout_cb(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    msg = await edit_message(
+        cb.message,
+        "⏳ **Attempting to log out from Tidal DL NG...**"
+    )
+
+    try:
+        command = "env PYTHONPATH=/usr/src/app/tidal-dl-ng python cli.py logout"
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd='/usr/src/app/tidal-dl-ng/tidal_dl_ng'
+        )
+
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+
+        output = stdout.decode().strip()
+        err_msg = stderr.decode().strip()
+
+        if process.returncode == 0 and "successfully logged out" in output:
+            await edit_message(
+                msg,
+                "✅ **Logout Successful!**\n\n"
+                "You have been logged out from Tidal DL NG."
+            )
+        else:
+            await edit_message(
+                msg,
+                f"❌ **Logout Failed**\n\n"
+                f"The logout process failed. Please try again.\n\n"
+                f"**Error:**\n`{err_msg or output or 'No error message from script.'}`"
+            )
+
+    except asyncio.TimeoutError:
+        process.kill()
+        await edit_message(
+            msg,
+            "❌ **Logout Timed Out**\n\nPlease try again."
+        )
+    except Exception as e:
+        await edit_message(
+            msg,
+            f"❌ **An Error Occurred**\n\n"
+            f"An unexpected error occurred while trying to log out.\n\n"
+            f"`{str(e)}`"
+        )
