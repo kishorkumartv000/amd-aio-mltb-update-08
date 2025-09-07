@@ -288,7 +288,16 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
         return await apple_interactive_menu(c, cb)
     # Record expected key in conversation state
     await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": key, "chat_id": cb.message.chat.id})
-    await edit_message(cb.message, f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="appleP")]]))
+    try:
+        await c.answer_callback_query(cb.id)
+    except Exception:
+        pass
+    # Send a separate prompt message so the panel does not change back unexpectedly
+    await c.send_message(
+        cb.message.chat.id,
+        f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="appleP")]])
+    )
 
 
 @Client.on_message(filters.text, group=13)
@@ -318,6 +327,11 @@ async def apple_handle_yaml_value(c: Client, msg: Message):
     try:
         _yaml_set(key, val)
         await send_message(msg, f"✅ Set <code>{key}</code>.")
+        # Refresh Apple panel quickly
+        try:
+            await apple_cb(c, Message(id=msg.id, chat=msg.chat))
+        except Exception:
+            pass
     except Exception as e:
         await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
     await cs.clear(msg.from_user.id)
