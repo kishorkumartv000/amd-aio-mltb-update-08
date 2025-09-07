@@ -110,16 +110,105 @@ async def apple_cb(c, cb: CallbackQuery):
         }
         current = Config.APPLE_DEFAULT_FORMAT
         formats[current] += ' ✅'
-        
+        # Build Apple panel buttons dynamically to include Apple-specific zip toggles
+        from ..settings import bot_set as _bs
+        zip_album_label = f"Zip Albums (Apple): {'ON ✅' if getattr(_bs, 'apple_album_zip', False) else 'OFF'}"
+        zip_playlist_label = f"Zip Playlists (Apple): {'ON ✅' if getattr(_bs, 'apple_playlist_zip', False) else 'OFF'}"
+
+        # Read YAML for labels
+        try:
+            from .config_yaml import _read_yaml_lines, _get_key, YAML_PATH
+            lines = _read_yaml_lines(YAML_PATH)
+        except Exception:
+            lines = []
+        def gv(k: str, d: str = "-"):
+            try:
+                v = _get_key(lines, k)
+                return (v or d).strip('"')
+            except Exception:
+                return d
+        lab_cover_size = f"Cover Size: {gv('cover-size','5000x5000')}"
+        lab_cover_fmt = f"Cover Format: {gv('cover-format','jpg')}"
+        lab_embed_cover = f"Embed Cover: {'ON ✅' if gv('embed-cover','true').lower()=='true' else 'OFF'}"
+        lab_embed_lrc = f"Embed Lyrics: {'ON ✅' if gv('embed-lrc','true').lower()=='true' else 'OFF'}"
+        lab_save_lrc = f"Save Lyrics File: {'ON ✅' if gv('save-lrc-file','false').lower()=='true' else 'OFF'}"
+        lab_lrc_type = f"Lyrics Type: {gv('lrc-type','lyrics')}"
+        lab_lrc_fmt = f"Lyrics Format: {gv('lrc-format','lrc')}"
+        lab_save_artist = f"Save Artist Cover: {'ON ✅' if gv('save-artist-cover','false').lower()=='true' else 'OFF'}"
+        lab_anim_aw = f"Animated Artwork: {'ON ✅' if gv('save-animated-artwork','false').lower()=='true' else 'OFF'}"
+        lab_emby_anim = f"Emby Animated: {'ON ✅' if gv('emby-animated-artwork','false').lower()=='true' else 'OFF'}"
+        lab_mv_audio = f"MV Audio: {gv('mv-audio-type','atmos')}"
+        lab_mv_max = f"MV Max: {gv('mv-max','2160')}"
+        lab_dl_cov_pl = f"DL AlbumCover for Playlist: {'ON ✅' if gv('dl-albumcover-for-playlist','false').lower()=='true' else 'OFF'}"
+        lab_use_songinfo = f"Use Songinfo for Playlist: {'ON ✅' if gv('use-songinfo-for-playlist','false').lower()=='true' else 'OFF'}"
+        lab_limit_max = f"Limit Max: {gv('limit-max','200')}"
+        lab_album_fmt = f"Album Folder: {gv('album-folder-format','{AlbumName}')}"
+        lab_playlist_fmt = f"Playlist Folder: {gv('playlist-folder-format','{PlaylistName}')}"
+        lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
+
+        buttons = []
+        for fmt, label in formats.items():
+            buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
+        buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
+        buttons.append([
+            InlineKeyboardButton("🧩 Setup Wrapper", callback_data="appleSetup"),
+            InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
+        ])
+        buttons.append([
+            InlineKeyboardButton(zip_album_label, callback_data="appleToggleZipAlbum"),
+            InlineKeyboardButton(zip_playlist_label, callback_data="appleToggleZipPlaylist")
+        ])
+        # Artwork & cover controls
+        buttons.append([
+            InlineKeyboardButton(lab_cover_size, callback_data="appleCycleCoverSize"),
+            InlineKeyboardButton(lab_cover_fmt, callback_data="appleCycleCoverFormat"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_embed_cover, callback_data="appleToggleEmbedCover"),
+            InlineKeyboardButton(lab_save_artist, callback_data="appleToggleSaveArtistCover"),
+        ])
+        # Lyrics controls
+        buttons.append([
+            InlineKeyboardButton(lab_lrc_type, callback_data="appleCycleLyricsType"),
+            InlineKeyboardButton(lab_lrc_fmt, callback_data="appleCycleLyricsFormat"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_embed_lrc, callback_data="appleToggleEmbedLrc"),
+            InlineKeyboardButton(lab_save_lrc, callback_data="appleToggleSaveLrc"),
+        ])
+        # Animated artwork / MV
+        buttons.append([
+            InlineKeyboardButton(lab_anim_aw, callback_data="appleToggleAnimatedArtwork"),
+            InlineKeyboardButton(lab_emby_anim, callback_data="appleToggleEmbyAnimatedArtwork"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_mv_audio, callback_data="appleCycleMvAudioType"),
+            InlineKeyboardButton(lab_mv_max, callback_data="appleCycleMvMax"),
+        ])
+        # Playlist enhancements
+        buttons.append([
+            InlineKeyboardButton(lab_dl_cov_pl, callback_data="appleToggleDlAlbumCoverPlaylist"),
+            InlineKeyboardButton(lab_use_songinfo, callback_data="appleToggleUseSonginfoPlaylist"),
+        ])
+        # Concurrency and naming presets
+        buttons.append([
+            InlineKeyboardButton(lab_limit_max, callback_data="appleCycleLimitMax"),
+            InlineKeyboardButton("Workers Info", callback_data="noop"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_album_fmt, callback_data="appleCycleAlbumFolderFormat"),
+            InlineKeyboardButton(lab_playlist_fmt, callback_data="appleCyclePlaylistFolderFormat"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
+        ])
+        buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
+
         await edit_message(
             cb.message,
             "🍎 **Apple Music Settings**\n\n"
-            "Use the buttons below to configure formats, quality, and manage the Wrapper service.\n\n"
-            "**Available Formats:**\n"
-            "- ALAC: Apple Lossless Audio Codec\n"
-            "- Dolby Atmos: Spatial audio experience\n\n"
-            "**Current Default Format:**",
-            apple_button(formats)
+            "Control formats, quality, wrapper, and Apple-specific zip behavior.",
+            InlineKeyboardMarkup(buttons)
         )
 
 
@@ -169,6 +258,322 @@ async def apple_set_quality_cb(c, cb: CallbackQuery):
         set_db.set_variable(f'APPLE_{format_type.upper()}_QUALITY', quality)
         setattr(Config, f'APPLE_{format_type.upper()}_QUALITY', quality)
         await apple_quality_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleZipAlbum$"))
+async def apple_toggle_zip_album(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_album_zip = not bool(getattr(bot_set, 'apple_album_zip', False))
+            set_db.set_variable('APPLE_ALBUM_ZIP', bot_set.apple_album_zip)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleZipPlaylist$"))
+async def apple_toggle_zip_playlist(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_playlist_zip = not bool(getattr(bot_set, 'apple_playlist_zip', False))
+            set_db.set_variable('APPLE_PLAYLIST_ZIP', bot_set.apple_playlist_zip)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
+
+
+def _yaml_set(key: str, value: str):
+    from .config_yaml import _read_yaml_lines, _set_key, _write_yaml_lines, _backup, YAML_PATH
+    lines = _read_yaml_lines(YAML_PATH)
+    _backup(YAML_PATH)
+    new_lines = _set_key(lines, key, value)
+    _write_yaml_lines(YAML_PATH, new_lines)
+
+
+def _yaml_toggle_bool(key: str, default_true: bool = True):
+    from .config_yaml import _read_yaml_lines, _get_key
+    cur_lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+    cur = (_get_key(cur_lines, key) or ("true" if default_true else "false")).split("#",1)[0].strip().lower()
+    newv = "false" if cur == "true" else "true"
+    _yaml_set(key, newv)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleCoverSize$"))
+async def apple_cycle_cover_size(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        sizes = ["1000x1000", "3000x3000", "5000x5000"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'cover-size') or '5000x5000').strip('"')
+        try:
+            idx = sizes.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('cover-size', sizes[(idx + 1) % len(sizes)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleCoverFormat$"))
+async def apple_cycle_cover_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        fmts = ["jpg", "png", "original"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'cover-format') or 'jpg').strip('"')
+        try:
+            idx = fmts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('cover-format', fmts[(idx + 1) % len(fmts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleEmbedCover$"))
+async def apple_toggle_embed_cover(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('embed-cover', True)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleSaveArtistCover$"))
+async def apple_toggle_save_artist_cover(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('save-artist-cover', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleLyricsType$"))
+async def apple_cycle_lyrics_type(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["lyrics", "syllable-lyrics"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'lrc-type') or 'lyrics').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('lrc-type', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleLyricsFormat$"))
+async def apple_cycle_lyrics_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["lrc", "ttml"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'lrc-format') or 'lrc').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('lrc-format', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleEmbedLrc$"))
+async def apple_toggle_embed_lrc(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('embed-lrc', True)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleSaveLrc$"))
+async def apple_toggle_save_lrc(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('save-lrc-file', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleAnimatedArtwork$"))
+async def apple_toggle_animated_artwork(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('save-animated-artwork', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleEmbyAnimatedArtwork$"))
+async def apple_toggle_emby_animated_artwork(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('emby-animated-artwork', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleMvAudioType$"))
+async def apple_cycle_mv_audio_type(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["atmos", "ac3", "aac"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'mv-audio-type') or 'atmos').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('mv-audio-type', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleMvMax$"))
+async def apple_cycle_mv_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["1080", "1440", "2160"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'mv-max') or '2160').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('mv-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleDlAlbumCoverPlaylist$"))
+async def apple_toggle_dl_albumcover_playlist(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('dl-albumcover-for-playlist', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleUseSonginfoPlaylist$"))
+async def apple_toggle_use_songinfo_playlist(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _yaml_toggle_bool('use-songinfo-for-playlist', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleLimitMax$"))
+async def apple_cycle_limit_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["100", "150", "200", "300", "400"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'limit-max') or '200').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('limit-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAlbumFolderFormat$"))
+async def apple_cycle_album_folder_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{AlbumName}",
+            "{ArtistName} - {AlbumName}",
+            "{ReleaseYear} - {ArtistName} - {AlbumName}",
+            "{ReleaseYear} - {AlbumName}",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'album-folder-format') or '{AlbumName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('album-folder-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCyclePlaylistFolderFormat$"))
+async def apple_cycle_playlist_folder_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{PlaylistName}",
+            "{ArtistName} - {PlaylistName}",
+            "{Quality} - {PlaylistName}",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'playlist-folder-format') or '{PlaylistName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('playlist-folder-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleSongFileFormat$"))
+async def apple_cycle_song_file_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{SongNumer}. {SongName}",
+            "{TrackNumber}. {SongName}",
+            "{TrackNumber}. {ArtistName} - {SongName}",
+            "{SongName} [{Quality}]",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'song-file-format') or '{SongNumer}. {SongName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('song-file-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
 
 
 # Apple Wrapper: Stop with confirmation

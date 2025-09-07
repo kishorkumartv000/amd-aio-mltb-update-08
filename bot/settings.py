@@ -128,6 +128,12 @@ class BotSettings:
         else:
             self.extract_embedded_cover = _to_bool(db_extract)
 
+        # Apple-specific zip toggles (separate from core)
+        apple_album_zip, _ = set_db.get_variable('APPLE_ALBUM_ZIP')
+        apple_playlist_zip, _ = set_db.get_variable('APPLE_PLAYLIST_ZIP')
+        self.apple_album_zip = _to_bool(apple_album_zip)
+        self.apple_playlist_zip = _to_bool(apple_playlist_zip)
+
         # Tidal NG specific zip toggles (separate from core)
         tng_album_zip, _ = set_db.get_variable('TIDAL_NG_ALBUM_ZIP')
         tng_playlist_zip, _ = set_db.get_variable('TIDAL_NG_PLAYLIST_ZIP')
