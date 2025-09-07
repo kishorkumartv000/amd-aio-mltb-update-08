@@ -142,11 +142,19 @@ async def apple_cb(c, cb: CallbackQuery):
         lab_dl_cov_pl = f"DL AlbumCover for Playlist: {'ON ✅' if gv('dl-albumcover-for-playlist','false').lower()=='true' else 'OFF'}"
         lab_use_songinfo = f"Use Songinfo for Playlist: {'ON ✅' if gv('use-songinfo-for-playlist','false').lower()=='true' else 'OFF'}"
         lab_limit_max = f"Limit Max: {gv('limit-max','200')}"
+        lab_aac_type = f"AAC Type: {gv('aac-type','aac-lc')}"
+        lab_alac_max = f"ALAC Max: {gv('alac-max','192000')}"
+        lab_atmos_max = f"ATMOS Max: {gv('atmos-max','2768')}"
+        lab_m3u8_mode = f"M3U8 Mode: {gv('get-m3u8-mode','hires')}"
+        lab_language = f"Language: {gv('language','-')}"
+        lab_storefront = f"Storefront: {gv('storefront','US')}"
         lab_album_fmt = f"Album Folder: {gv('album-folder-format','{AlbumName}')}"
         lab_playlist_fmt = f"Playlist Folder: {gv('playlist-folder-format','{PlaylistName}')}"
         lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
 
         buttons = []
+        # Interactive editing entry
+        buttons.append([InlineKeyboardButton("✏️ Interactive Edit (Apple)", callback_data="appleInteractive")])
         for fmt, label in formats.items():
             buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
         buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
@@ -202,6 +210,19 @@ async def apple_cb(c, cb: CallbackQuery):
         buttons.append([
             InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
         ])
+        # Audio pipeline and network options
+        buttons.append([
+            InlineKeyboardButton(lab_aac_type, callback_data="appleCycleAacType"),
+            InlineKeyboardButton(lab_alac_max, callback_data="appleCycleAlacMax"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_atmos_max, callback_data="appleCycleAtmosMax"),
+            InlineKeyboardButton(lab_m3u8_mode, callback_data="appleCycleM3u8Mode"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_language, callback_data="applePromptLanguage"),
+            InlineKeyboardButton(lab_storefront, callback_data="applePromptStorefront"),
+        ])
         buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
 
         await edit_message(
@@ -210,6 +231,69 @@ async def apple_cb(c, cb: CallbackQuery):
             "Control formats, quality, wrapper, and Apple-specific zip behavior.",
             InlineKeyboardMarkup(buttons)
         )
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleInteractive$"))
+async def apple_interactive_menu(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    rows = [
+        [InlineKeyboardButton("Set media-user-token", callback_data="applePromptYaml|media-user-token")],
+        [InlineKeyboardButton("Set authorization-token", callback_data="applePromptYaml|authorization-token")],
+        [InlineKeyboardButton("Set storefront", callback_data="applePromptYaml|storefront")],
+        [InlineKeyboardButton("Set language", callback_data="applePromptYaml|language")],
+        [InlineKeyboardButton("Set cover-size", callback_data="applePromptYaml|cover-size")],
+        [InlineKeyboardButton("Set album-folder-format", callback_data="applePromptYaml|album-folder-format")],
+        [InlineKeyboardButton("Set playlist-folder-format", callback_data="applePromptYaml|playlist-folder-format")],
+        [InlineKeyboardButton("Set song-file-format", callback_data="applePromptYaml|song-file-format")],
+        [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
+    ]
+    await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(rows))
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptYaml\|"))
+async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        key = cb.data.split("|", 1)[1]
+    except Exception:
+        key = None
+    if not key:
+        return await apple_interactive_menu(c, cb)
+    # Record expected key in conversation state
+    await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": key, "chat_id": cb.message.chat.id})
+    await edit_message(cb.message, f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="appleP")]]))
+
+
+@Client.on_message(filters.text, group=13)
+async def apple_handle_yaml_value(c: Client, msg: Message):
+    from ..helpers.state import conversation_state as cs
+    st = await cs.get(msg.from_user.id)
+    if not st or st.get("stage") != "apple_yaml_set":
+        return
+    key = (st.get("data") or {}).get("key")
+    if not key:
+        await cs.clear(msg.from_user.id)
+        return
+    val = (msg.text or "").strip()
+    try:
+        # Quote sensitive keys
+        try:
+            from .config_yaml import SENSITIVE_KEYS
+            if key in SENSITIVE_KEYS and not (val.startswith('"') or val.startswith("'")):
+                val = f'"{val}"'
+        except Exception:
+            pass
+        from .provider_settings import _yaml_set as __set  # self-import safe in runtime context
+    except Exception:
+        # Fallback import path
+        pass
+    # Use local helper directly
+    try:
+        _yaml_set(key, val)
+        await send_message(msg, f"✅ Set <code>{key}</code>.")
+    except Exception as e:
+        await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
+    await cs.clear(msg.from_user.id)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^appleF"))
@@ -576,6 +660,115 @@ async def apple_cycle_song_file_format(c: Client, cb: CallbackQuery):
     await apple_cb(c, cb)
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAacType$"))
+async def apple_cycle_aac_type(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["aac-lc", "aac", "aac-binaural", "aac-downmix"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'aac-type') or 'aac-lc').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('aac-type', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAlacMax$"))
+async def apple_cycle_alac_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["44100", "48000", "96000", "192000"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'alac-max') or '192000').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('alac-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAtmosMax$"))
+async def apple_cycle_atmos_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["2448", "2768"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'atmos-max') or '2768').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('atmos-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleM3u8Mode$"))
+async def apple_cycle_m3u8_mode(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["hires", "all"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'get-m3u8-mode') or 'hires').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('get-m3u8-mode', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptLanguage$"))
+async def apple_prompt_language(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    # For simplicity, rotate a small set; full free-text would require convo state
+    try:
+        opts = ["", "en", "hi", "tr", "jp"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'language') or '').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('language', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptStorefront$"))
+async def apple_prompt_storefront(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["US", "IN", "TR", "JP", "CA"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'storefront') or 'US').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('storefront', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
 # Apple Wrapper: Stop with confirmation
 @Client.on_callback_query(filters.regex(pattern=r"^appleStop$"))
 async def apple_wrapper_stop_cb(c: Client, cb: CallbackQuery):
@@ -866,6 +1059,7 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         mcd_label = f"Cover Size: {mcd}"
 
         buttons = [
+            [InlineKeyboardButton("✏️ Interactive Edit (Tidal NG)", callback_data="tidalNgInteractive")],
             [
                 InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),
                 InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
@@ -1371,6 +1565,63 @@ async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgInteractive$"))
+async def tidal_ng_interactive_menu(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    rows = [
+        [InlineKeyboardButton("Set quality_audio", callback_data="tidalNgPromptJson|quality_audio")],
+        [InlineKeyboardButton("Set quality_video", callback_data="tidalNgPromptJson|quality_video")],
+        [InlineKeyboardButton("Set download_base_path", callback_data="tidalNgPromptJson|download_base_path")],
+        [InlineKeyboardButton("Set downloads_concurrent_max", callback_data="tidalNgPromptJson|downloads_concurrent_max")],
+        [InlineKeyboardButton("Set metadata_cover_dimension", callback_data="tidalNgPromptJson|metadata_cover_dimension")],
+        [InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")],
+    ]
+    await edit_message(cb.message, "Send a value for the selected Tidal NG key.", InlineKeyboardMarkup(rows))
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgPromptJson\|"))
+async def tidal_ng_prompt_json(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        key = cb.data.split("|", 1)[1]
+    except Exception:
+        key = None
+    if not key:
+        return await tidal_ng_interactive_menu(c, cb)
+    await conversation_state.start(cb.from_user.id, "tidal_ng_json_set", {"key": key, "chat_id": cb.message.chat.id})
+    await edit_message(cb.message, f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]]))
+
+
+@Client.on_message(filters.text, group=14)
+async def tidal_ng_handle_json_value(c: Client, msg: Message):
+    from ..helpers.state import conversation_state as cs
+    st = await cs.get(msg.from_user.id)
+    if not st or st.get("stage") != "tidal_ng_json_set":
+        return
+    key = (st.get("data") or {}).get("key")
+    if not key:
+        await cs.clear(msg.from_user.id)
+        return
+    val = (msg.text or "").strip()
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        _backup(JSON_PATH)
+        # Cast numeric keys when appropriate
+        if key in {"downloads_concurrent_max", "metadata_cover_dimension"}:
+            try:
+                data[key] = int(val)
+            except Exception:
+                data[key] = val
+        else:
+            data[key] = val
+        _write_json(JSON_PATH, data)
+        await send_message(msg, f"✅ Set <code>{key}</code>.")
+    except Exception as e:
+        await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
+    await cs.clear(msg.from_user.id)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleConvertMp4$"))
