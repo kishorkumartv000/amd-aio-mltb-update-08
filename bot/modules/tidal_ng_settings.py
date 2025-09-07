@@ -29,6 +29,9 @@ INTEGER_KEYS = {
     "metadata_cover_dimension", "downloads_simultaneous_per_track_max",
     "album_track_num_pad_min", "downloads_concurrent_max",
 }
+FLOAT_KEYS = {
+    "download_delay_sec_min", "download_delay_sec_max",
+}
 
 # Helper functions adapted for JSON
 def _read_json(path: str) -> dict:
@@ -116,6 +119,12 @@ async def tidal_ng_set(c: Client, msg: Message):
         except ValueError:
             await send_message(msg, f"`{key}` must be an integer.")
             return
+    elif key_l in FLOAT_KEYS:
+        try:
+            value = float(value_str)
+        except ValueError:
+            await send_message(msg, f"`{key}` must be a number (float).")
+            return
 
     data = _read_json(JSON_PATH)
     _backup(JSON_PATH)
@@ -127,6 +136,21 @@ async def tidal_ng_set(c: Client, msg: Message):
         await send_message(msg, f"Failed to write config: {e}")
         return
     await send_message(msg, f"Updated `{key}` to `{value}`.")
+
+
+def _mutate_json_key(key: str, mutate_fn) -> tuple[bool, str]:
+    data = _read_json(JSON_PATH)
+    if not data:
+        return False, "Config missing. Use Execute cfg to generate."
+    try:
+        before = data.get(key)
+        after = mutate_fn(before)
+        _backup(JSON_PATH)
+        data[key] = after
+        _write_json(JSON_PATH, data)
+        return True, f"`{key}`: {before} -> {after}"
+    except Exception as e:
+        return False, str(e)
 
 @Client.on_message(filters.command(["tidal_ng_toggle"]))
 async def tidal_ng_toggle(c: Client, msg: Message):

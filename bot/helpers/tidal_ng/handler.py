@@ -65,11 +65,15 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
 
         # --- Execute Download ---
         await edit_message(bot_msg, "🚀 Starting Tidal NG download...")
+        # Ensure ffmpeg path is set for the tool via environment/config
+        env = os.environ.copy()
+        env["FFMPEG_PATH"] = "/usr/bin/ffmpeg"
         cmd = ["python", TIDAL_DL_NG_CLI_PATH, "dl", link]
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         await asyncio.gather(
             log_progress(process.stdout, bot_msg, user),

@@ -441,6 +441,10 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
             ],
             [
+                InlineKeyboardButton("↓ Concurrency -", callback_data="tidalNgDecConcurrency"),
+                InlineKeyboardButton("↑ Concurrency +", callback_data="tidalNgIncConcurrency")
+            ],
+            [
                 InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
                 InlineKeyboardButton(zip_playlist_label, callback_data="tidalNgToggleZipPlaylist")
             ],
@@ -716,4 +720,28 @@ async def tidal_ng_toggle_zip_playlist(c, cb: CallbackQuery):
         set_db.set_variable('TIDAL_NG_PLAYLIST_ZIP', bot_set.tidal_ng_playlist_zip)
     except Exception:
         pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgIncConcurrency$"))
+async def tidal_ng_inc_concurrency(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    from .tidal_ng_settings import _mutate_json_key
+    ok, msg = _mutate_json_key(
+        "downloads_concurrent_max",
+        lambda prev: max(1, int(prev or 3) + 1)
+    )
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgDecConcurrency$"))
+async def tidal_ng_dec_concurrency(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    from .tidal_ng_settings import _mutate_json_key
+    ok, msg = _mutate_json_key(
+        "downloads_concurrent_max",
+        lambda prev: max(1, int(prev or 3) - 1)
+    )
     await tidal_ng_cb(c, cb)

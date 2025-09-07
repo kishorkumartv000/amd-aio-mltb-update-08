@@ -11,6 +11,10 @@ def get_tidal_ng_download_base_path() -> str:
     - Falls back to ~/download if missing or error
     """
     try:
+        # Environment override for Docker-based deployments
+        override = os.environ.get("TIDAL_NG_DOWNLOAD_BASE_PATH")
+        if override:
+            return os.path.expanduser(override)
         with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
             settings = json.load(f)
 
