@@ -548,8 +548,9 @@ async def _post_rclone_manage_button(user, remote_info: dict):
         }
         await conversation_state.update(user['user_id'], rclone_manage_map=manage_map)
 
+        # Use rcloneManageStart|<token> to open the Cloud-to-Cloud manage flow
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📂 Browse uploaded files", callback_data=f"rclone_browse:{token}")]
+            [InlineKeyboardButton("📂 Manage uploaded files", callback_data=f"rcloneManageStart|{token}")]
         ])
         await send_message(user, "✅ Uploaded via Rclone.", reply_markup=kb)
     except Exception as e:
