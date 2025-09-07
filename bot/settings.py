@@ -128,6 +128,13 @@ class BotSettings:
         else:
             self.extract_embedded_cover = _to_bool(db_extract)
 
+        # Tidal NG specific zip toggles (separate from core)
+        tng_album_zip, _ = set_db.get_variable('TIDAL_NG_ALBUM_ZIP')
+        tng_playlist_zip, _ = set_db.get_variable('TIDAL_NG_PLAYLIST_ZIP')
+        # default False when unset
+        self.tidal_ng_album_zip = _to_bool(tng_album_zip)
+        self.tidal_ng_playlist_zip = _to_bool(tng_playlist_zip)
+
         self.clients = []
         self.download_history = download_history
 
