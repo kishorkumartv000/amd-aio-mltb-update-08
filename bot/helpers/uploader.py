@@ -552,6 +552,6 @@ async def _post_rclone_manage_button(user, remote_info: dict):
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("📂 Manage uploaded files", callback_data=f"rcloneManageStart|{token}")]
         ])
-        await send_message(user, "✅ Uploaded via Rclone.", reply_markup=kb)
+        await send_message(user, "✅ Uploaded via Rclone.", itype='text', markup=kb)
     except Exception as e:
         LOGGER.error(f"Error posting Rclone manage button: {e}")
