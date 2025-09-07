@@ -164,7 +164,14 @@ async def create_link(path, basepath):
     Returns:
         rclone_link, index_link
     """
-    path = str(Path(path).relative_to(basepath))
+    # Normalize inputs; fall back to basename if relative fails
+    try:
+        path = str(Path(path).resolve().relative_to(Path(basepath).resolve()))
+    except Exception:
+        try:
+            path = os.path.basename(path) if os.path.isfile(path) else os.path.basename(os.path.normpath(path))
+        except Exception:
+            path = os.path.basename(str(path))
 
     rclone_link = None
     index_link = None

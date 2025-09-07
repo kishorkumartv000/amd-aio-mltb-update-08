@@ -217,6 +217,13 @@ async def rclone_upload(user, realpath):
         'is_dir': is_directory
     }
 
+    # Post manage button right after upload to match Apple/Tidal NG UX
+    try:
+        if remote_info:
+            await _post_rclone_manage_button(user, remote_info)
+    except Exception:
+        pass
+
     return r_link, i_link, remote_info
 
 
