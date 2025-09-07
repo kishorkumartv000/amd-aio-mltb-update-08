@@ -141,6 +141,10 @@ async def apple_cb(c, cb: CallbackQuery):
         lab_mv_max = f"MV Max: {gv('mv-max','2160')}"
         lab_dl_cov_pl = f"DL AlbumCover for Playlist: {'ON ✅' if gv('dl-albumcover-for-playlist','false').lower()=='true' else 'OFF'}"
         lab_use_songinfo = f"Use Songinfo for Playlist: {'ON ✅' if gv('use-songinfo-for-playlist','false').lower()=='true' else 'OFF'}"
+        lab_limit_max = f"Limit Max: {gv('limit-max','200')}"
+        lab_album_fmt = f"Album Folder: {gv('album-folder-format','{AlbumName}')}"
+        lab_playlist_fmt = f"Playlist Folder: {gv('playlist-folder-format','{PlaylistName}')}"
+        lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
 
         buttons = []
         for fmt, label in formats.items():
@@ -185,6 +189,18 @@ async def apple_cb(c, cb: CallbackQuery):
         buttons.append([
             InlineKeyboardButton(lab_dl_cov_pl, callback_data="appleToggleDlAlbumCoverPlaylist"),
             InlineKeyboardButton(lab_use_songinfo, callback_data="appleToggleUseSonginfoPlaylist"),
+        ])
+        # Concurrency and naming presets
+        buttons.append([
+            InlineKeyboardButton(lab_limit_max, callback_data="appleCycleLimitMax"),
+            InlineKeyboardButton("Workers Info", callback_data="noop"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_album_fmt, callback_data="appleCycleAlbumFolderFormat"),
+            InlineKeyboardButton(lab_playlist_fmt, callback_data="appleCyclePlaylistFolderFormat"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
         ])
         buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
 
@@ -469,6 +485,92 @@ async def apple_toggle_use_songinfo_playlist(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True): return
     try:
         _yaml_toggle_bool('use-songinfo-for-playlist', False)
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleLimitMax$"))
+async def apple_cycle_limit_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["100", "150", "200", "300", "400"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'limit-max') or '200').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('limit-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAlbumFolderFormat$"))
+async def apple_cycle_album_folder_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{AlbumName}",
+            "{ArtistName} - {AlbumName}",
+            "{ReleaseYear} - {ArtistName} - {AlbumName}",
+            "{ReleaseYear} - {AlbumName}",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'album-folder-format') or '{AlbumName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('album-folder-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCyclePlaylistFolderFormat$"))
+async def apple_cycle_playlist_folder_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{PlaylistName}",
+            "{ArtistName} - {PlaylistName}",
+            "{Quality} - {PlaylistName}",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'playlist-folder-format') or '{PlaylistName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('playlist-folder-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleSongFileFormat$"))
+async def apple_cycle_song_file_format(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        presets = [
+            "{SongNumer}. {SongName}",
+            "{TrackNumber}. {SongName}",
+            "{TrackNumber}. {ArtistName} - {SongName}",
+            "{SongName} [{Quality}]",
+        ]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'song-file-format') or '{SongNumer}. {SongName}').strip('"')
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('song-file-format', presets[(idx + 1) % len(presets)])
     except Exception:
         pass
     await apple_cb(c, cb)
