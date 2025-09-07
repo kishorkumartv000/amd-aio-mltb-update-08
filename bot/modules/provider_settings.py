@@ -153,6 +153,8 @@ async def apple_cb(c, cb: CallbackQuery):
         lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
 
         buttons = []
+        # Interactive editing entry
+        buttons.append([InlineKeyboardButton("✏️ Interactive Edit (Apple)", callback_data="appleInteractive")])
         for fmt, label in formats.items():
             buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
         buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
@@ -229,6 +231,69 @@ async def apple_cb(c, cb: CallbackQuery):
             "Control formats, quality, wrapper, and Apple-specific zip behavior.",
             InlineKeyboardMarkup(buttons)
         )
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleInteractive$"))
+async def apple_interactive_menu(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    rows = [
+        [InlineKeyboardButton("Set media-user-token", callback_data="applePromptYaml|media-user-token")],
+        [InlineKeyboardButton("Set authorization-token", callback_data="applePromptYaml|authorization-token")],
+        [InlineKeyboardButton("Set storefront", callback_data="applePromptYaml|storefront")],
+        [InlineKeyboardButton("Set language", callback_data="applePromptYaml|language")],
+        [InlineKeyboardButton("Set cover-size", callback_data="applePromptYaml|cover-size")],
+        [InlineKeyboardButton("Set album-folder-format", callback_data="applePromptYaml|album-folder-format")],
+        [InlineKeyboardButton("Set playlist-folder-format", callback_data="applePromptYaml|playlist-folder-format")],
+        [InlineKeyboardButton("Set song-file-format", callback_data="applePromptYaml|song-file-format")],
+        [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
+    ]
+    await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(rows))
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptYaml\|"))
+async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        key = cb.data.split("|", 1)[1]
+    except Exception:
+        key = None
+    if not key:
+        return await apple_interactive_menu(c, cb)
+    # Record expected key in conversation state
+    await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": key, "chat_id": cb.message.chat.id})
+    await edit_message(cb.message, f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="appleP")]]))
+
+
+@Client.on_message(filters.text, group=13)
+async def apple_handle_yaml_value(c: Client, msg: Message):
+    from ..helpers.state import conversation_state as cs
+    st = await cs.get(msg.from_user.id)
+    if not st or st.get("stage") != "apple_yaml_set":
+        return
+    key = (st.get("data") or {}).get("key")
+    if not key:
+        await cs.clear(msg.from_user.id)
+        return
+    val = (msg.text or "").strip()
+    try:
+        # Quote sensitive keys
+        try:
+            from .config_yaml import SENSITIVE_KEYS
+            if key in SENSITIVE_KEYS and not (val.startswith('"') or val.startswith("'")):
+                val = f'"{val}"'
+        except Exception:
+            pass
+        from .provider_settings import _yaml_set as __set  # self-import safe in runtime context
+    except Exception:
+        # Fallback import path
+        pass
+    # Use local helper directly
+    try:
+        _yaml_set(key, val)
+        await send_message(msg, f"✅ Set <code>{key}</code>.")
+    except Exception as e:
+        await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
+    await cs.clear(msg.from_user.id)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^appleF"))
