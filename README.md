@@ -158,6 +158,7 @@ This new system replaces the old, non-functional UI buttons and gives you comple
 ### Important Notes
 - **FFmpeg Path**: The bot will always forcefully set the `path_binary_ffmpeg` to `/usr/bin/ffmpeg` before every download to ensure video processing and FLAC extraction works reliably. You do not need to set this key yourself.
 - **Download Path**: The bot will always set the `download_base_path` to a temporary, per-task directory to ensure downloads do not conflict. The `TIDAL_NG_DOWNLOAD_PATH` environment variable can still be used to override this.
+    - New: You can now override the Tidal NG `download_base_path` via environment: `TIDAL_NG_DOWNLOAD_BASE_PATH`. This takes precedence over `settings.json` (legacy `TIDAL_NG_DOWNLOAD_PATH` also supported).
 
 ## Apple Wrapper Controls (Apple Music)
 
@@ -194,13 +195,32 @@ This new system replaces the old, non-functional UI buttons and gives you comple
 - You can cancel the flow any time by sending `/cancel`.
 - If 2FA prompt does not appear (rare), setup continues and completes automatically.
 
+## Apple Music Controls (enhanced)
+
+The Apple provider now has its own zip controls and a rich settings panel driven by `config.yaml` (as used by `zhaarey/apple-music-downloader`).
+
+- Apple-specific zip toggles (independent from core):
+  - Zip Albums (Apple)
+  - Zip Playlists (Apple)
+
+- Config panel buttons (mutate `APPLE_CONFIG_YAML_PATH`):
+  - Cover: size (1000/3000/5000), format (jpg/png/original), embed cover, save artist cover
+  - Lyrics: type (lyrics/syllable-lyrics), format (lrc/ttml), embed lyrics, save lyrics file
+  - Animated artwork: save animated artwork, emby animated artwork
+  - Music video: MV audio type (atmos/ac3/aac), MV max (1080/1440/2160)
+  - Playlist helpers: download album cover for playlist, use songinfo for playlist
+  - Concurrency: `limit-max` (cycle common values)
+  - Naming: album folder format presets, playlist folder format presets, song file format presets
+
+Commands `/config_get`, `/config_set`, `/config_toggle`, `/config_show` still work and write to `config.yaml` safely with backups.
+
 ## Commands and Usage
 
 These commands work in any chat where the bot is present. Copy-paste directly into Telegram.
 
 - /start: Show welcome message
 - /help: Show available commands
-- /settings: Open settings panel
+- /settings: Open settings panel (Provider panels include Tidal NG JSON and Apple YAML configurators)
 - /download <url> [--options]: Start a download for a supported provider
 This build is Apple Music–only. Qobuz, Tidal, and Deezer integrations have been removed. Use Apple Music links like `https://music.apple.com/...`.
   - Examples:

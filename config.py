@@ -74,7 +74,9 @@ class Config:
     TIDAL_COUNTRY_CODE     = getenv("TIDAL_COUNTRY_CODE", "US")           # ISO country code (e.g. "US")
     TIDAL_QUALITY          = getenv("TIDAL_QUALITY")                      # LOW, HIGH, LOSSLESS, HI_RES
     TIDAL_SPATIAL          = getenv("TIDAL_SPATIAL")                      # OFF, ATMOS AC3 JOC, ATMOS AC4, Sony 360RA
-    TIDAL_NG_DOWNLOAD_PATH = getenv("TIDAL_NG_DOWNLOAD_PATH")             # Optional: Custom download path for Tidal NG
+    TIDAL_NG_DOWNLOAD_PATH = getenv("TIDAL_NG_DOWNLOAD_PATH")             # Optional: Custom download path for Tidal NG (legacy)
+    # New: Env override for Tidal NG download_base_path (takes precedence over settings.json)
+    TIDAL_NG_DOWNLOAD_BASE_PATH = getenv("TIDAL_NG_DOWNLOAD_BASE_PATH")
 
     # Concurrent Workers
     MAX_WORKERS      = int(getenv("MAX_WORKERS", 5))                       # Number of threads (int)
