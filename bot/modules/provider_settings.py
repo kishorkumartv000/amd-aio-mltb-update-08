@@ -308,8 +308,14 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
         key = None
     if not key:
         return await apple_interactive_menu(c, cb)
-    # Record expected key in conversation state
-    await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": key, "chat_id": cb.message.chat.id})
+    # Record expected key in conversation state (preserve interactive menu msg id if present)
+    prev = await conversation_state.get(cb.from_user.id) or {}
+    menu_id = (prev.get('data') or {}).get('apple_menu_msg_id')
+    await conversation_state.start(cb.from_user.id, "apple_yaml_set", {
+        "key": key,
+        "chat_id": cb.message.chat.id,
+        "apple_menu_msg_id": menu_id
+    })
     try:
         await c.answer_callback_query(cb.id)
     except Exception:
@@ -320,10 +326,10 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
         menu_id = (st.get('data') or {}).get('apple_menu_msg_id')
         target_msg = cb.message
         if menu_id and (str(menu_id).isdigit()):
-            target_msg = type(cb.message)(
-                id=int(menu_id),
-                chat=cb.message.chat
-            )
+            try:
+                target_msg = await c.get_messages(cb.message.chat.id, int(menu_id))
+            except Exception:
+                target_msg = cb.message
         def _rows(selected: str | None = None):
             def lab(txt: str, k: str) -> list:
                 disp = f"{txt} ✅" if selected == k else txt
