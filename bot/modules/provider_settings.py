@@ -1197,8 +1197,8 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                     InlineKeyboardButton(zip_playlist_label, callback_data="tidalNgToggleZipPlaylist")
                 ],
             ]
-            [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
         ]
+        buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
         await edit_message(
             cb.message,
             text,
