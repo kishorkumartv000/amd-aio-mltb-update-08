@@ -1059,6 +1059,7 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         mcd_label = f"Cover Size: {mcd}"
 
         buttons = [
+            [InlineKeyboardButton("✏️ Interactive Edit (Tidal NG)", callback_data="tidalNgInteractive")],
             [
                 InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),
                 InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
@@ -1564,6 +1565,63 @@ async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgInteractive$"))
+async def tidal_ng_interactive_menu(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    rows = [
+        [InlineKeyboardButton("Set quality_audio", callback_data="tidalNgPromptJson|quality_audio")],
+        [InlineKeyboardButton("Set quality_video", callback_data="tidalNgPromptJson|quality_video")],
+        [InlineKeyboardButton("Set download_base_path", callback_data="tidalNgPromptJson|download_base_path")],
+        [InlineKeyboardButton("Set downloads_concurrent_max", callback_data="tidalNgPromptJson|downloads_concurrent_max")],
+        [InlineKeyboardButton("Set metadata_cover_dimension", callback_data="tidalNgPromptJson|metadata_cover_dimension")],
+        [InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")],
+    ]
+    await edit_message(cb.message, "Send a value for the selected Tidal NG key.", InlineKeyboardMarkup(rows))
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgPromptJson\|"))
+async def tidal_ng_prompt_json(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        key = cb.data.split("|", 1)[1]
+    except Exception:
+        key = None
+    if not key:
+        return await tidal_ng_interactive_menu(c, cb)
+    await conversation_state.start(cb.from_user.id, "tidal_ng_json_set", {"key": key, "chat_id": cb.message.chat.id})
+    await edit_message(cb.message, f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")]]))
+
+
+@Client.on_message(filters.text, group=14)
+async def tidal_ng_handle_json_value(c: Client, msg: Message):
+    from ..helpers.state import conversation_state as cs
+    st = await cs.get(msg.from_user.id)
+    if not st or st.get("stage") != "tidal_ng_json_set":
+        return
+    key = (st.get("data") or {}).get("key")
+    if not key:
+        await cs.clear(msg.from_user.id)
+        return
+    val = (msg.text or "").strip()
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        _backup(JSON_PATH)
+        # Cast numeric keys when appropriate
+        if key in {"downloads_concurrent_max", "metadata_cover_dimension"}:
+            try:
+                data[key] = int(val)
+            except Exception:
+                data[key] = val
+        else:
+            data[key] = val
+        _write_json(JSON_PATH, data)
+        await send_message(msg, f"✅ Set <code>{key}</code>.")
+    except Exception as e:
+        await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
+    await cs.clear(msg.from_user.id)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleConvertMp4$"))
