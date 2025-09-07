@@ -142,6 +142,12 @@ async def apple_cb(c, cb: CallbackQuery):
         lab_dl_cov_pl = f"DL AlbumCover for Playlist: {'ON ✅' if gv('dl-albumcover-for-playlist','false').lower()=='true' else 'OFF'}"
         lab_use_songinfo = f"Use Songinfo for Playlist: {'ON ✅' if gv('use-songinfo-for-playlist','false').lower()=='true' else 'OFF'}"
         lab_limit_max = f"Limit Max: {gv('limit-max','200')}"
+        lab_aac_type = f"AAC Type: {gv('aac-type','aac-lc')}"
+        lab_alac_max = f"ALAC Max: {gv('alac-max','192000')}"
+        lab_atmos_max = f"ATMOS Max: {gv('atmos-max','2768')}"
+        lab_m3u8_mode = f"M3U8 Mode: {gv('get-m3u8-mode','hires')}"
+        lab_language = f"Language: {gv('language','-')}"
+        lab_storefront = f"Storefront: {gv('storefront','US')}"
         lab_album_fmt = f"Album Folder: {gv('album-folder-format','{AlbumName}')}"
         lab_playlist_fmt = f"Playlist Folder: {gv('playlist-folder-format','{PlaylistName}')}"
         lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
@@ -201,6 +207,19 @@ async def apple_cb(c, cb: CallbackQuery):
         ])
         buttons.append([
             InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
+        ])
+        # Audio pipeline and network options
+        buttons.append([
+            InlineKeyboardButton(lab_aac_type, callback_data="appleCycleAacType"),
+            InlineKeyboardButton(lab_alac_max, callback_data="appleCycleAlacMax"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_atmos_max, callback_data="appleCycleAtmosMax"),
+            InlineKeyboardButton(lab_m3u8_mode, callback_data="appleCycleM3u8Mode"),
+        ])
+        buttons.append([
+            InlineKeyboardButton(lab_language, callback_data="applePromptLanguage"),
+            InlineKeyboardButton(lab_storefront, callback_data="applePromptStorefront"),
         ])
         buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
 
@@ -571,6 +590,115 @@ async def apple_cycle_song_file_format(c: Client, cb: CallbackQuery):
         except Exception:
             idx = -1
         _yaml_set('song-file-format', presets[(idx + 1) % len(presets)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAacType$"))
+async def apple_cycle_aac_type(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["aac-lc", "aac", "aac-binaural", "aac-downmix"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'aac-type') or 'aac-lc').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('aac-type', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAlacMax$"))
+async def apple_cycle_alac_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["44100", "48000", "96000", "192000"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'alac-max') or '192000').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('alac-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleAtmosMax$"))
+async def apple_cycle_atmos_max(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["2448", "2768"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'atmos-max') or '2768').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('atmos-max', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleCycleM3u8Mode$"))
+async def apple_cycle_m3u8_mode(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["hires", "all"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'get-m3u8-mode') or 'hires').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('get-m3u8-mode', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptLanguage$"))
+async def apple_prompt_language(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    # For simplicity, rotate a small set; full free-text would require convo state
+    try:
+        opts = ["", "en", "hi", "tr", "jp"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'language') or '').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('language', opts[(idx + 1) % len(opts)])
+    except Exception:
+        pass
+    await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^applePromptStorefront$"))
+async def apple_prompt_storefront(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        opts = ["US", "IN", "TR", "JP", "CA"]
+        from .config_yaml import _read_yaml_lines, _get_key
+        lines = _read_yaml_lines(Config.APPLE_CONFIG_YAML_PATH)
+        cur = (_get_key(lines, 'storefront') or 'US').strip('"')
+        try:
+            idx = opts.index(cur)
+        except Exception:
+            idx = -1
+        _yaml_set('storefront', opts[(idx + 1) % len(opts)])
     except Exception:
         pass
     await apple_cb(c, cb)
