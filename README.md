@@ -159,6 +159,7 @@ This new system replaces the old, non-functional UI buttons and gives you comple
 - **FFmpeg Path**: The bot will always forcefully set the `path_binary_ffmpeg` to `/usr/bin/ffmpeg` before every download to ensure video processing and FLAC extraction works reliably. You do not need to set this key yourself.
 - **Download Path**: The bot will always set the `download_base_path` to a temporary, per-task directory to ensure downloads do not conflict. The `TIDAL_NG_DOWNLOAD_PATH` environment variable can still be used to override this.
     - New: You can now override the Tidal NG `download_base_path` via environment: `TIDAL_NG_DOWNLOAD_BASE_PATH`. This takes precedence over `settings.json` (legacy `TIDAL_NG_DOWNLOAD_PATH` also supported).
+    - New: A top-of-panel toggle, “Preset Buttons: ON/OFF”, lets you temporarily hide the cycling/toggle preset buttons to avoid accidental changes. Interactive JSON commands (`/tidal_ng_*`) remain available.
 
 ## Apple Wrapper Controls (Apple Music)
 
@@ -213,6 +214,19 @@ The Apple provider now has its own zip controls and a rich settings panel driven
   - Naming: album folder format presets, playlist folder format presets, song file format presets
 
 Commands `/config_get`, `/config_set`, `/config_toggle`, `/config_show` still work and write to `config.yaml` safely with backups.
+
+### Flags Popup for Apple /download
+
+- Enable in Settings → Providers → Apple Music → “Flags Popup”.
+- When ON, sending `/download <apple_url>` opens a quick picker to avoid typing flags:
+  - Single track: applies `--song`
+  - Atmos album: applies `--atmos`
+  - Atmos track: applies `--song --atmos`
+- The popup closes after selection or cancel. When OFF, manual flags still work (e.g., `/download --song <url>`).
+
+### Guard against accidental touches
+
+- A top-of-panel toggle, “Preset Buttons: ON/OFF”, hides the cycling/toggle preset buttons in the Apple panel to prevent accidental config edits. The interactive editor remains available.
 
 ## Commands and Usage
 
