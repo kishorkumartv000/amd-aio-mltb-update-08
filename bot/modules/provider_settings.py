@@ -426,10 +426,39 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "Use `/tidal_ng_config` for more help.\n\n"
             "You can also use the buttons below for other actions."
         )
-        # Inject Tidal NG specific zip toggles
+        # Inject Tidal NG specific zip toggles and advanced settings pulled from CLI
         from ..settings import bot_set as _bs
+        try:
+            from .tidal_ng_settings import _read_json, JSON_PATH, CHOICE_KEYS
+            _cfg = _read_json(JSON_PATH)
+        except Exception:
+            _cfg = {}
+            CHOICE_KEYS = {"quality_audio": ["LOW","HIGH","LOSSLESS","HI_RES_LOSSLESS"], "quality_video": ["360","480","720","1080"]}
         zip_album_label = f"Zip Albums (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_album_zip', False) else 'OFF'}"
         zip_playlist_label = f"Zip Playlists (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_playlist_zip', False) else 'OFF'}"
+        # Advanced toggles/choices reflecting settings.json
+        _qa = str(_cfg.get('quality_audio', 'HIGH'))
+        _qv = str(_cfg.get('quality_video', '480'))
+        qa_label = f"Audio Quality: {_qa}"
+        qv_label = f"Video Quality: {_qv}"
+        vd_label = f"Video Download: {'ON ✅' if bool(_cfg.get('video_download', True)) else 'OFF'}"
+        xf_label = f"Extract FLAC: {'ON ✅' if bool(_cfg.get('extract_flac', True)) else 'OFF'}"
+        mp4_label = f"Convert to MP4: {'ON ✅' if bool(_cfg.get('video_convert_mp4', True)) else 'OFF'}"
+        se_label = f"Skip Existing: {'ON ✅' if bool(_cfg.get('skip_existing', True)) else 'OFF'}"
+        st_label = f"Symlink to Track: {'ON ✅' if bool(_cfg.get('symlink_to_track', False)) else 'OFF'}"
+        pc_label = f"Playlist Create: {'ON ✅' if bool(_cfg.get('playlist_create', False)) else 'OFF'}"
+        dsp_min = float(_cfg.get('download_delay_sec_min', 3.0) or 3.0)
+        dsp_max = float(_cfg.get('download_delay_sec_max', 5.0) or 5.0)
+        delay_label = f"Delay: {dsp_min:.1f}/{dsp_max:.1f}s"
+        sim_label = f"Sim per Track: {int(_cfg.get('downloads_simultaneous_per_track_max', 20) or 20)}"
+        pad_label = f"Track Pad Min: {int(_cfg.get('album_track_num_pad_min', 1) or 1)}"
+        le_label = f"Lyrics Embed: {'ON ✅' if bool(_cfg.get('lyrics_embed', False)) else 'OFF'}"
+        lf_label = f"Lyrics File: {'ON ✅' if bool(_cfg.get('lyrics_file', False)) else 'OFF'}"
+        rg_label = f"Replay Gain: {'ON ✅' if bool(_cfg.get('metadata_replay_gain', True)) else 'OFF'}"
+        ce_label = f"Cover Embed: {'ON ✅' if bool(_cfg.get('metadata_cover_embed', True)) else 'OFF'}"
+        caf_label = f"Cover File: {'ON ✅' if bool(_cfg.get('cover_album_file', True)) else 'OFF'}"
+        mcd = int(_cfg.get('metadata_cover_dimension', 320) or 320)
+        mcd_label = f"Cover Size: {mcd}"
 
         buttons = [
             [
@@ -439,6 +468,46 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
                 InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
+            ],
+            [
+                InlineKeyboardButton("↓ Concurrency -", callback_data="tidalNgDecConcurrency"),
+                InlineKeyboardButton("↑ Concurrency +", callback_data="tidalNgIncConcurrency")
+            ],
+            [
+                InlineKeyboardButton(qa_label, callback_data="tidalNgCycleQualityAudio"),
+                InlineKeyboardButton(qv_label, callback_data="tidalNgCycleQualityVideo"),
+            ],
+            [
+                InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
+                InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
+            ],
+            [
+                InlineKeyboardButton(mp4_label, callback_data="tidalNgToggleConvertMp4"),
+                InlineKeyboardButton(se_label, callback_data="tidalNgToggleSkipExisting"),
+            ],
+            [
+                InlineKeyboardButton(st_label, callback_data="tidalNgToggleSymlink"),
+                InlineKeyboardButton(pc_label, callback_data="tidalNgTogglePlaylistCreate"),
+            ],
+            [
+                InlineKeyboardButton(delay_label, callback_data="tidalNgCycleDelay"),
+                InlineKeyboardButton(sim_label, callback_data="tidalNgCycleSimPerTrack"),
+            ],
+            [
+                InlineKeyboardButton(pad_label, callback_data="tidalNgCycleTrackPad"),
+                InlineKeyboardButton("Reset Delays", callback_data="tidalNgResetDelay"),
+            ],
+            [
+                InlineKeyboardButton(le_label, callback_data="tidalNgToggleLyricsEmbed"),
+                InlineKeyboardButton(lf_label, callback_data="tidalNgToggleLyricsFile"),
+            ],
+            [
+                InlineKeyboardButton(rg_label, callback_data="tidalNgToggleReplayGain"),
+                InlineKeyboardButton(ce_label, callback_data="tidalNgToggleCoverEmbed"),
+            ],
+            [
+                InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
+                InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
             ],
             [
                 InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
@@ -714,6 +783,307 @@ async def tidal_ng_toggle_zip_playlist(c, cb: CallbackQuery):
         from ..helpers.database.pg_impl import set_db
         bot_set.tidal_ng_playlist_zip = not bool(getattr(bot_set, 'tidal_ng_playlist_zip', False))
         set_db.set_variable('TIDAL_NG_PLAYLIST_ZIP', bot_set.tidal_ng_playlist_zip)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgIncConcurrency$"))
+async def tidal_ng_inc_concurrency(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    from .tidal_ng_settings import _mutate_json_key
+    ok, msg = _mutate_json_key(
+        "downloads_concurrent_max",
+        lambda prev: max(1, int(prev or 3) + 1)
+    )
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgDecConcurrency$"))
+async def tidal_ng_dec_concurrency(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    from .tidal_ng_settings import _mutate_json_key
+    ok, msg = _mutate_json_key(
+        "downloads_concurrent_max",
+        lambda prev: max(1, int(prev or 3) - 1)
+    )
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleQualityAudio$"))
+async def tidal_ng_cycle_quality_audio(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH, CHOICE_KEYS
+        data = _read_json(JSON_PATH)
+        choices = CHOICE_KEYS.get('quality_audio') or ["LOW","HIGH","LOSSLESS","HI_RES_LOSSLESS"]
+        cur = str(data.get('quality_audio', 'HIGH'))
+        try:
+            idx = choices.index(cur)
+        except Exception:
+            idx = -1
+        newv = choices[(idx + 1) % len(choices)]
+        _backup(JSON_PATH)
+        data['quality_audio'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleQualityVideo$"))
+async def tidal_ng_cycle_quality_video(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH, CHOICE_KEYS
+        data = _read_json(JSON_PATH)
+        choices = CHOICE_KEYS.get('quality_video') or ["360","480","720","1080"]
+        cur = str(data.get('quality_video', '480'))
+        try:
+            idx = choices.index(cur)
+        except Exception:
+            idx = -1
+        newv = choices[(idx + 1) % len(choices)]
+        _backup(JSON_PATH)
+        data['quality_video'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleVideoDownload$"))
+async def tidal_ng_toggle_video_download(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        cur = bool(data.get('video_download', True))
+        data['video_download'] = (not cur)
+        _backup(JSON_PATH)
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleExtractFlac$"))
+async def tidal_ng_toggle_extract_flac(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        cur = bool(data.get('extract_flac', True))
+        data['extract_flac'] = (not cur)
+        _backup(JSON_PATH)
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+def _toggle_json_bool(key: str):
+    from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+    data = _read_json(JSON_PATH)
+    cur = bool(data.get(key, False))
+    data[key] = (not cur)
+    _backup(JSON_PATH)
+    _write_json(JSON_PATH, data)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleLyricsEmbed$"))
+async def tidal_ng_toggle_lyrics_embed(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('lyrics_embed')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleLyricsFile$"))
+async def tidal_ng_toggle_lyrics_file(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('lyrics_file')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleReplayGain$"))
+async def tidal_ng_toggle_replay_gain(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('metadata_replay_gain')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleCoverEmbed$"))
+async def tidal_ng_toggle_cover_embed(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('metadata_cover_embed')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleCoverFile$"))
+async def tidal_ng_toggle_cover_file(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('cover_album_file')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleCoverSize$"))
+async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        sizes = [320, 640, 1000, 2000, 5000]
+        cur = int(data.get('metadata_cover_dimension', 320) or 320)
+        try:
+            idx = sizes.index(cur)
+        except Exception:
+            idx = -1
+        newv = sizes[(idx + 1) % len(sizes)]
+        _backup(JSON_PATH)
+        data['metadata_cover_dimension'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleConvertMp4$"))
+async def tidal_ng_toggle_convert_mp4(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('video_convert_mp4')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleSkipExisting$"))
+async def tidal_ng_toggle_skip_existing(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('skip_existing')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleSymlink$"))
+async def tidal_ng_toggle_symlink(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('symlink_to_track')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgTogglePlaylistCreate$"))
+async def tidal_ng_toggle_playlist_create(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('playlist_create')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleDelay$"))
+async def tidal_ng_cycle_delay(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        presets = [(1.0, 2.0), (3.0, 5.0), (5.0, 10.0), (0.0, 0.0)]
+        cur = (float(data.get('download_delay_sec_min', 3.0) or 3.0), float(data.get('download_delay_sec_max', 5.0) or 5.0))
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        newv = presets[(idx + 1) % len(presets)]
+        _backup(JSON_PATH)
+        data['download_delay'] = (newv != (0.0, 0.0))
+        data['download_delay_sec_min'] = newv[0]
+        data['download_delay_sec_max'] = newv[1]
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgResetDelay$"))
+async def tidal_ng_reset_delay(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        _backup(JSON_PATH)
+        data['download_delay'] = True
+        data['download_delay_sec_min'] = 3.0
+        data['download_delay_sec_max'] = 5.0
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleSimPerTrack$"))
+async def tidal_ng_cycle_sim_per_track(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        options = [8, 12, 16, 20, 24]
+        cur = int(data.get('downloads_simultaneous_per_track_max', 20) or 20)
+        try:
+            idx = options.index(cur)
+        except Exception:
+            idx = -1
+        newv = options[(idx + 1) % len(options)]
+        _backup(JSON_PATH)
+        data['downloads_simultaneous_per_track_max'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleTrackPad$"))
+async def tidal_ng_cycle_track_pad(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        options = [1, 2, 3]
+        cur = int(data.get('album_track_num_pad_min', 1) or 1)
+        try:
+            idx = options.index(cur)
+        except Exception:
+            idx = -1
+        newv = options[(idx + 1) % len(options)]
+        _backup(JSON_PATH)
+        data['album_track_num_pad_min'] = newv
+        _write_json(JSON_PATH, data)
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
