@@ -141,6 +141,9 @@ class BotSettings:
         self.tidal_ng_album_zip = _to_bool(tng_album_zip)
         self.tidal_ng_playlist_zip = _to_bool(tng_playlist_zip)
 
+        # Apple flags popup for /download (Apple-only)
+        self.apple_flags_popup = _to_bool(__getvalue__('APPLE_FLAGS_POPUP'))
+
         self.clients = []
         self.download_history = download_history
 
