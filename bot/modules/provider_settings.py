@@ -155,9 +155,18 @@ async def apple_cb(c, cb: CallbackQuery):
         buttons = []
         # Interactive editing entry
         buttons.append([InlineKeyboardButton("✏️ Interactive Edit (Apple)", callback_data="appleInteractive")])
-        for fmt, label in formats.items():
-            buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
-        buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
+        # Top-level guard toggle for cycling presets
+        try:
+            from ..settings import bot_set as _bs_guard
+            guard_label = f"Preset Buttons: {'ON ✅' if getattr(_bs_guard, 'apple_cycle_presets_enabled', True) else 'OFF'}"
+        except Exception:
+            guard_label = "Preset Buttons: ON ✅"
+        buttons.append([InlineKeyboardButton(guard_label, callback_data="appleTogglePresetGuard")])
+        from ..settings import bot_set as _bs_guard2
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            for fmt, label in formats.items():
+                buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
+            buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
         buttons.append([
             InlineKeyboardButton("🧩 Setup Wrapper", callback_data="appleSetup"),
             InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
@@ -167,58 +176,67 @@ async def apple_cb(c, cb: CallbackQuery):
             InlineKeyboardButton(zip_playlist_label, callback_data="appleToggleZipPlaylist")
         ])
         # Artwork & cover controls
-        buttons.append([
-            InlineKeyboardButton(lab_cover_size, callback_data="appleCycleCoverSize"),
-            InlineKeyboardButton(lab_cover_fmt, callback_data="appleCycleCoverFormat"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_embed_cover, callback_data="appleToggleEmbedCover"),
-            InlineKeyboardButton(lab_save_artist, callback_data="appleToggleSaveArtistCover"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_cover_size, callback_data="appleCycleCoverSize"),
+                InlineKeyboardButton(lab_cover_fmt, callback_data="appleCycleCoverFormat"),
+            ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_embed_cover, callback_data="appleToggleEmbedCover"),
+                InlineKeyboardButton(lab_save_artist, callback_data="appleToggleSaveArtistCover"),
+            ])
         # Lyrics controls
-        buttons.append([
-            InlineKeyboardButton(lab_lrc_type, callback_data="appleCycleLyricsType"),
-            InlineKeyboardButton(lab_lrc_fmt, callback_data="appleCycleLyricsFormat"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_embed_lrc, callback_data="appleToggleEmbedLrc"),
-            InlineKeyboardButton(lab_save_lrc, callback_data="appleToggleSaveLrc"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_lrc_type, callback_data="appleCycleLyricsType"),
+                InlineKeyboardButton(lab_lrc_fmt, callback_data="appleCycleLyricsFormat"),
+            ])
+            buttons.append([
+                InlineKeyboardButton(lab_embed_lrc, callback_data="appleToggleEmbedLrc"),
+                InlineKeyboardButton(lab_save_lrc, callback_data="appleToggleSaveLrc"),
+            ])
         # Animated artwork / MV
-        buttons.append([
-            InlineKeyboardButton(lab_anim_aw, callback_data="appleToggleAnimatedArtwork"),
-            InlineKeyboardButton(lab_emby_anim, callback_data="appleToggleEmbyAnimatedArtwork"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_mv_audio, callback_data="appleCycleMvAudioType"),
-            InlineKeyboardButton(lab_mv_max, callback_data="appleCycleMvMax"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_anim_aw, callback_data="appleToggleAnimatedArtwork"),
+                InlineKeyboardButton(lab_emby_anim, callback_data="appleToggleEmbyAnimatedArtwork"),
+            ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_mv_audio, callback_data="appleCycleMvAudioType"),
+                InlineKeyboardButton(lab_mv_max, callback_data="appleCycleMvMax"),
+            ])
         # Playlist enhancements
-        buttons.append([
-            InlineKeyboardButton(lab_dl_cov_pl, callback_data="appleToggleDlAlbumCoverPlaylist"),
-            InlineKeyboardButton(lab_use_songinfo, callback_data="appleToggleUseSonginfoPlaylist"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_dl_cov_pl, callback_data="appleToggleDlAlbumCoverPlaylist"),
+                InlineKeyboardButton(lab_use_songinfo, callback_data="appleToggleUseSonginfoPlaylist"),
+            ])
         # Concurrency and naming presets
-        buttons.append([
-            InlineKeyboardButton(lab_limit_max, callback_data="appleCycleLimitMax"),
-            InlineKeyboardButton("Workers Info", callback_data="noop"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_album_fmt, callback_data="appleCycleAlbumFolderFormat"),
-            InlineKeyboardButton(lab_playlist_fmt, callback_data="appleCyclePlaylistFolderFormat"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_limit_max, callback_data="appleCycleLimitMax"),
+                InlineKeyboardButton("Workers Info", callback_data="noop"),
+            ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_album_fmt, callback_data="appleCycleAlbumFolderFormat"),
+                InlineKeyboardButton(lab_playlist_fmt, callback_data="appleCyclePlaylistFolderFormat"),
+            ])
+            buttons.append([
+                InlineKeyboardButton(lab_song_fmt, callback_data="appleCycleSongFileFormat"),
+            ])
         # Audio pipeline and network options
-        buttons.append([
-            InlineKeyboardButton(lab_aac_type, callback_data="appleCycleAacType"),
-            InlineKeyboardButton(lab_alac_max, callback_data="appleCycleAlacMax"),
-        ])
-        buttons.append([
-            InlineKeyboardButton(lab_atmos_max, callback_data="appleCycleAtmosMax"),
-            InlineKeyboardButton(lab_m3u8_mode, callback_data="appleCycleM3u8Mode"),
-        ])
+        if getattr(_bs_guard2, 'apple_cycle_presets_enabled', True):
+            buttons.append([
+                InlineKeyboardButton(lab_aac_type, callback_data="appleCycleAacType"),
+                InlineKeyboardButton(lab_alac_max, callback_data="appleCycleAlacMax"),
+            ])
+            buttons.append([
+                InlineKeyboardButton(lab_atmos_max, callback_data="appleCycleAtmosMax"),
+                InlineKeyboardButton(lab_m3u8_mode, callback_data="appleCycleM3u8Mode"),
+            ])
         # Apple flags popup toggle
         try:
             from ..settings import bot_set as _bs2
@@ -421,6 +439,19 @@ async def apple_toggle_flags_popup(c: Client, cb: CallbackQuery):
             from ..helpers.database.pg_impl import set_db
             bot_set.apple_flags_popup = not bool(getattr(bot_set, 'apple_flags_popup', False))
             set_db.set_variable('APPLE_FLAGS_POPUP', bot_set.apple_flags_popup)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleTogglePresetGuard$"))
+async def apple_toggle_preset_guard(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_cycle_presets_enabled = not bool(getattr(bot_set, 'apple_cycle_presets_enabled', True))
+            set_db.set_variable('APPLE_CYCLE_PRESETS_ENABLED', bot_set.apple_cycle_presets_enabled)
         except Exception:
             pass
         await apple_cb(c, cb)
@@ -1079,8 +1110,18 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         mcd = int(_cfg.get('metadata_cover_dimension', 320) or 320)
         mcd_label = f"Cover Size: {mcd}"
 
+        # Top-level guard toggle for Tidal NG preset cycling
+        try:
+            from ..settings import bot_set as _bs_guard
+            guard_label = f"Preset Buttons: {'ON ✅' if getattr(_bs_guard, 'tidal_ng_cycle_presets_enabled', True) else 'OFF'}"
+            guard_enabled = getattr(_bs_guard, 'tidal_ng_cycle_presets_enabled', True)
+        except Exception:
+            guard_label = "Preset Buttons: ON ✅"
+            guard_enabled = True
+
         buttons = [
             [InlineKeyboardButton("✏️ Interactive Edit (Tidal NG)", callback_data="tidalNgInteractive")],
+            [InlineKeyboardButton(guard_label, callback_data="tidalNgTogglePresetGuard")],
             [
                 InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),
                 InlineKeyboardButton("🚨 Logout", callback_data="tidalNgLogout")
@@ -1089,50 +1130,59 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
                 InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
             ],
-            [
-                InlineKeyboardButton("↓ Concurrency -", callback_data="tidalNgDecConcurrency"),
-                InlineKeyboardButton("↑ Concurrency +", callback_data="tidalNgIncConcurrency")
-            ],
-            [
-                InlineKeyboardButton(qa_label, callback_data="tidalNgCycleQualityAudio"),
-                InlineKeyboardButton(qv_label, callback_data="tidalNgCycleQualityVideo"),
-            ],
-            [
-                InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
-                InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
-            ],
-            [
-                InlineKeyboardButton(mp4_label, callback_data="tidalNgToggleConvertMp4"),
-                InlineKeyboardButton(se_label, callback_data="tidalNgToggleSkipExisting"),
-            ],
-            [
-                InlineKeyboardButton(st_label, callback_data="tidalNgToggleSymlink"),
-                InlineKeyboardButton(pc_label, callback_data="tidalNgTogglePlaylistCreate"),
-            ],
-            [
-                InlineKeyboardButton(delay_label, callback_data="tidalNgCycleDelay"),
-                InlineKeyboardButton(sim_label, callback_data="tidalNgCycleSimPerTrack"),
-            ],
-            [
-                InlineKeyboardButton(pad_label, callback_data="tidalNgCycleTrackPad"),
-                InlineKeyboardButton("Reset Delays", callback_data="tidalNgResetDelay"),
-            ],
-            [
-                InlineKeyboardButton(le_label, callback_data="tidalNgToggleLyricsEmbed"),
-                InlineKeyboardButton(lf_label, callback_data="tidalNgToggleLyricsFile"),
-            ],
-            [
-                InlineKeyboardButton(rg_label, callback_data="tidalNgToggleReplayGain"),
-                InlineKeyboardButton(ce_label, callback_data="tidalNgToggleCoverEmbed"),
-            ],
-            [
-                InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
-                InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
-            ],
-            [
-                InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
-                InlineKeyboardButton(zip_playlist_label, callback_data="tidalNgToggleZipPlaylist")
-            ],
+        ]
+
+        if guard_enabled:
+            buttons += [
+                [
+                    InlineKeyboardButton("↓ Concurrency -", callback_data="tidalNgDecConcurrency"),
+                    InlineKeyboardButton("↑ Concurrency +", callback_data="tidalNgIncConcurrency")
+                ],
+            ]
+        
+        if guard_enabled:
+            buttons += [
+                [
+                    InlineKeyboardButton(qa_label, callback_data="tidalNgCycleQualityAudio"),
+                    InlineKeyboardButton(qv_label, callback_data="tidalNgCycleQualityVideo"),
+                ],
+                [
+                    InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
+                    InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
+                ],
+                [
+                    InlineKeyboardButton(mp4_label, callback_data="tidalNgToggleConvertMp4"),
+                    InlineKeyboardButton(se_label, callback_data="tidalNgToggleSkipExisting"),
+                ],
+                [
+                    InlineKeyboardButton(st_label, callback_data="tidalNgToggleSymlink"),
+                    InlineKeyboardButton(pc_label, callback_data="tidalNgTogglePlaylistCreate"),
+                ],
+                [
+                    InlineKeyboardButton(delay_label, callback_data="tidalNgCycleDelay"),
+                    InlineKeyboardButton(sim_label, callback_data="tidalNgCycleSimPerTrack"),
+                ],
+                [
+                    InlineKeyboardButton(pad_label, callback_data="tidalNgCycleTrackPad"),
+                    InlineKeyboardButton("Reset Delays", callback_data="tidalNgResetDelay"),
+                ],
+                [
+                    InlineKeyboardButton(le_label, callback_data="tidalNgToggleLyricsEmbed"),
+                    InlineKeyboardButton(lf_label, callback_data="tidalNgToggleLyricsFile"),
+                ],
+                [
+                    InlineKeyboardButton(rg_label, callback_data="tidalNgToggleReplayGain"),
+                    InlineKeyboardButton(ce_label, callback_data="tidalNgToggleCoverEmbed"),
+                ],
+                [
+                    InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
+                    InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
+                ],
+                [
+                    InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
+                    InlineKeyboardButton(zip_playlist_label, callback_data="tidalNgToggleZipPlaylist")
+                ],
+            ]
             [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
         ]
         await edit_message(
@@ -1406,6 +1456,17 @@ async def tidal_ng_toggle_zip_playlist(c, cb: CallbackQuery):
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgTogglePresetGuard$"))
+async def tidal_ng_toggle_preset_guard(c, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.tidal_ng_cycle_presets_enabled = not bool(getattr(bot_set, 'tidal_ng_cycle_presets_enabled', True))
+            set_db.set_variable('TIDAL_NG_CYCLE_PRESETS_ENABLED', bot_set.tidal_ng_cycle_presets_enabled)
+        except Exception:
+            pass
+        await tidal_ng_cb(c, cb)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNgIncConcurrency$"))

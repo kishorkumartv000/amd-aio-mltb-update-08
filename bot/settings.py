@@ -144,6 +144,12 @@ class BotSettings:
         # Apple flags popup for /download (Apple-only)
         self.apple_flags_popup = _to_bool(__getvalue__('APPLE_FLAGS_POPUP'))
 
+        # Preset cycling/toggle guards for panels
+        acpe, _ = set_db.get_variable('APPLE_CYCLE_PRESETS_ENABLED')
+        self.apple_cycle_presets_enabled = True if acpe is None else _to_bool(acpe)
+        tncpe, _ = set_db.get_variable('TIDAL_NG_CYCLE_PRESETS_ENABLED')
+        self.tidal_ng_cycle_presets_enabled = True if tncpe is None else _to_bool(tncpe)
+
         self.clients = []
         self.download_history = download_history
 
