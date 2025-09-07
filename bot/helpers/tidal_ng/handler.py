@@ -122,13 +122,52 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             content_type = "video"
 
         # --- Prepare Metadata for Uploader ---
+        # Determine the folder that contains this specific content (not the global download root)
+        item_dirs = [os.path.dirname(it["filepath"]) for it in items]
+        if content_type in ("album", "playlist") and len(item_dirs) > 1:
+            try:
+                content_folder = os.path.commonpath(item_dirs)
+            except Exception:
+                content_folder = item_dirs[0]
+        else:
+            content_folder = item_dirs[0]
+
+        # Resolve a human-friendly title for zips/messages
+        path_segments = content_folder.split(os.sep)
+        resolved_title = None
+        if content_type == "album":
+            resolved_title = items[0].get("album")
+            if not resolved_title:
+                if "Albums" in path_segments:
+                    idx = path_segments.index("Albums")
+                    if idx + 1 < len(path_segments):
+                        # Folder format often: "{album_artist} - {album_title}{album_explicit}"
+                        folder_name = path_segments[idx + 1]
+                        if " - " in folder_name:
+                            resolved_title = folder_name.split(" - ", 1)[1]
+                        else:
+                            resolved_title = folder_name
+                if not resolved_title:
+                    resolved_title = os.path.basename(content_folder)
+        elif content_type == "playlist":
+            if "Playlists" in path_segments:
+                idx = path_segments.index("Playlists")
+                if idx + 1 < len(path_segments):
+                    resolved_title = path_segments[idx + 1]
+            if not resolved_title:
+                resolved_title = os.path.basename(content_folder)
+        elif content_type in ("video", "track"):
+            resolved_title = items[0].get("title") or os.path.basename(items[0]["filepath"])
+        else:
+            resolved_title = items[0].get("title") or os.path.basename(content_folder)
+
         upload_meta = {
             "success": True,
             "type": content_type,
             "items": items,
-            "folderpath": str(final_download_path),
+            "folderpath": str(content_folder),
             "provider": "Tidal NG",
-            "title": items[0].get("album") if content_type == "album" else items[0].get("title"),
+            "title": resolved_title,
             "artist": items[0].get("artist"),
             "poster_msg": bot_msg,
         }
