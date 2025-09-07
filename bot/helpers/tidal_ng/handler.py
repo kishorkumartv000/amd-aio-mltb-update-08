@@ -116,14 +116,32 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             raise Exception("Metadata extraction failed for all downloaded files.")
 
         # --- Determine Content Type ---
-        content_type = "track"
-        if len(items) > 1:
-            if any(item.get("album") for item in items) and len(set(item.get("album") for item in items)) == 1:
-                content_type = "album"
-            else:
-                content_type = "playlist"
-        elif items[0]["filepath"].lower().endswith((".mp4", ".m4v")):
-            content_type = "video"
+        # Prefer folder semantics from exislow layout: Albums/, Playlists/, Mix/, Tracks/, Videos/
+        inferred_type = None
+        try:
+            first_dir_parts = os.path.dirname(items[0]["filepath"]).split(os.sep)
+            if "Albums" in first_dir_parts:
+                inferred_type = "album"
+            elif "Playlists" in first_dir_parts:
+                inferred_type = "playlist"
+            elif "Videos" in first_dir_parts:
+                inferred_type = "video"
+            elif "Tracks" in first_dir_parts:
+                inferred_type = "track"
+            elif "Mix" in first_dir_parts:
+                inferred_type = "playlist"
+        except Exception:
+            inferred_type = None
+
+        content_type = inferred_type or "track"
+        if not inferred_type:
+            if len(items) > 1:
+                if any(item.get("album") for item in items) and len(set(item.get("album") for item in items)) == 1:
+                    content_type = "album"
+                else:
+                    content_type = "playlist"
+            elif items[0]["filepath"].lower().endswith((".mp4", ".m4v")):
+                content_type = "video"
 
         # --- Prepare Metadata for Uploader ---
         # Determine the folder that contains this specific content (not the global download root)

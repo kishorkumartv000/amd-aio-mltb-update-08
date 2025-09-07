@@ -443,6 +443,13 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         qv_label = f"Video Quality: {_qv}"
         vd_label = f"Video Download: {'ON ✅' if bool(_cfg.get('video_download', True)) else 'OFF'}"
         xf_label = f"Extract FLAC: {'ON ✅' if bool(_cfg.get('extract_flac', True)) else 'OFF'}"
+        le_label = f"Lyrics Embed: {'ON ✅' if bool(_cfg.get('lyrics_embed', False)) else 'OFF'}"
+        lf_label = f"Lyrics File: {'ON ✅' if bool(_cfg.get('lyrics_file', False)) else 'OFF'}"
+        rg_label = f"Replay Gain: {'ON ✅' if bool(_cfg.get('metadata_replay_gain', True)) else 'OFF'}"
+        ce_label = f"Cover Embed: {'ON ✅' if bool(_cfg.get('metadata_cover_embed', True)) else 'OFF'}"
+        caf_label = f"Cover File: {'ON ✅' if bool(_cfg.get('cover_album_file', True)) else 'OFF'}"
+        mcd = int(_cfg.get('metadata_cover_dimension', 320) or 320)
+        mcd_label = f"Cover Size: {mcd}"
 
         buttons = [
             [
@@ -464,6 +471,18 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
                 InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
+            ],
+            [
+                InlineKeyboardButton(le_label, callback_data="tidalNgToggleLyricsEmbed"),
+                InlineKeyboardButton(lf_label, callback_data="tidalNgToggleLyricsFile"),
+            ],
+            [
+                InlineKeyboardButton(rg_label, callback_data="tidalNgToggleReplayGain"),
+                InlineKeyboardButton(ce_label, callback_data="tidalNgToggleCoverEmbed"),
+            ],
+            [
+                InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
+                InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
             ],
             [
                 InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
@@ -838,6 +857,86 @@ async def tidal_ng_toggle_extract_flac(c, cb: CallbackQuery):
         cur = bool(data.get('extract_flac', True))
         data['extract_flac'] = (not cur)
         _backup(JSON_PATH)
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+def _toggle_json_bool(key: str):
+    from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+    data = _read_json(JSON_PATH)
+    cur = bool(data.get(key, False))
+    data[key] = (not cur)
+    _backup(JSON_PATH)
+    _write_json(JSON_PATH, data)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleLyricsEmbed$"))
+async def tidal_ng_toggle_lyrics_embed(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('lyrics_embed')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleLyricsFile$"))
+async def tidal_ng_toggle_lyrics_file(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('lyrics_file')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleReplayGain$"))
+async def tidal_ng_toggle_replay_gain(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('metadata_replay_gain')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleCoverEmbed$"))
+async def tidal_ng_toggle_cover_embed(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('metadata_cover_embed')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleCoverFile$"))
+async def tidal_ng_toggle_cover_file(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('cover_album_file')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleCoverSize$"))
+async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        sizes = [320, 640, 1000, 2000, 5000]
+        cur = int(data.get('metadata_cover_dimension', 320) or 320)
+        try:
+            idx = sizes.index(cur)
+        except Exception:
+            idx = -1
+        newv = sizes[(idx + 1) % len(sizes)]
+        _backup(JSON_PATH)
+        data['metadata_cover_dimension'] = newv
         _write_json(JSON_PATH, data)
     except Exception:
         pass
