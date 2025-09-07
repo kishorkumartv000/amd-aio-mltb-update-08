@@ -279,7 +279,24 @@ async def apple_interactive_menu(c: Client, cb: CallbackQuery):
             [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
         ]
         return rows
-    await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(_rows()))
+    try:
+        await c.answer_callback_query(cb.id)
+    except Exception:
+        pass
+    # Create a separate interactive message and remember its id
+    try:
+        # delete previous interactive if any
+        state = await conversation_state.get(cb.from_user.id) or {}
+        old_id = (state.get('data') or {}).get('apple_menu_msg_id')
+        if old_id:
+            try:
+                await c.delete_messages(cb.message.chat.id, int(old_id))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    m = await c.send_message(cb.message.chat.id, "Send a value for the selected key.", reply_markup=InlineKeyboardMarkup(_rows()))
+    await conversation_state.update(cb.from_user.id, stage='apple_yaml_menu', apple_menu_msg_id=m.id)
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^applePromptYaml\|"))
@@ -297,8 +314,16 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
         await c.answer_callback_query(cb.id)
     except Exception:
         pass
-    # Visual feedback: tick the selected item in the interactive list
+    # Visual feedback: tick the selected item in the interactive list (separate message)
     try:
+        st = await conversation_state.get(cb.from_user.id) or {}
+        menu_id = (st.get('data') or {}).get('apple_menu_msg_id')
+        target_msg = cb.message
+        if menu_id and (str(menu_id).isdigit()):
+            target_msg = type(cb.message)(
+                id=int(menu_id),
+                chat=cb.message.chat
+            )
         def _rows(selected: str | None = None):
             def lab(txt: str, k: str) -> list:
                 disp = f"{txt} ✅" if selected == k else txt
@@ -315,7 +340,7 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
                 [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
             ]
             return rows
-        await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(_rows(selected=key)))
+        await edit_message(target_msg, "Send a value for the selected key.", InlineKeyboardMarkup(_rows(selected=key)))
     except Exception:
         pass
     # Send a separate prompt message so the panel does not change back unexpectedly
