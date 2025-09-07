@@ -284,7 +284,7 @@ async def music_video_upload(metadata, user):
 async def album_upload(metadata, user):
     base_path = await _get_tidal_ng_base_path(user['user_id'])
     if bot_set.upload_mode == 'Telegram':
-        if getattr(bot_set, 'album_zip', False):
+        if getattr(bot_set, 'tidal_ng_album_zip', False):
             # Always create a single descriptive zip for Telegram mode
             zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
             zip_paths = [zp]
@@ -332,7 +332,7 @@ async def album_upload(metadata, user):
 async def playlist_upload(metadata, user):
     base_path = await _get_tidal_ng_base_path(user['user_id'])
     if bot_set.upload_mode == 'Telegram':
-        if getattr(bot_set, 'playlist_zip', False):
+        if getattr(bot_set, 'tidal_ng_playlist_zip', False):
             zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
             caption = await format_string(
                 "🎵 **{title}**\n👤 Curated by {artist}\n🎧 {provider} Playlist",
