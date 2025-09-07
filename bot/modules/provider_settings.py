@@ -426,10 +426,23 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "Use `/tidal_ng_config` for more help.\n\n"
             "You can also use the buttons below for other actions."
         )
-        # Inject Tidal NG specific zip toggles
+        # Inject Tidal NG specific zip toggles and advanced settings pulled from CLI
         from ..settings import bot_set as _bs
+        try:
+            from .tidal_ng_settings import _read_json, JSON_PATH, CHOICE_KEYS
+            _cfg = _read_json(JSON_PATH)
+        except Exception:
+            _cfg = {}
+            CHOICE_KEYS = {"quality_audio": ["LOW","HIGH","LOSSLESS","HI_RES_LOSSLESS"], "quality_video": ["360","480","720","1080"]}
         zip_album_label = f"Zip Albums (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_album_zip', False) else 'OFF'}"
         zip_playlist_label = f"Zip Playlists (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_playlist_zip', False) else 'OFF'}"
+        # Advanced toggles/choices reflecting settings.json
+        _qa = str(_cfg.get('quality_audio', 'HIGH'))
+        _qv = str(_cfg.get('quality_video', '480'))
+        qa_label = f"Audio Quality: {_qa}"
+        qv_label = f"Video Quality: {_qv}"
+        vd_label = f"Video Download: {'ON ✅' if bool(_cfg.get('video_download', True)) else 'OFF'}"
+        xf_label = f"Extract FLAC: {'ON ✅' if bool(_cfg.get('extract_flac', True)) else 'OFF'}"
 
         buttons = [
             [
@@ -443,6 +456,14 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton("↓ Concurrency -", callback_data="tidalNgDecConcurrency"),
                 InlineKeyboardButton("↑ Concurrency +", callback_data="tidalNgIncConcurrency")
+            ],
+            [
+                InlineKeyboardButton(qa_label, callback_data="tidalNgCycleQualityAudio"),
+                InlineKeyboardButton(qv_label, callback_data="tidalNgCycleQualityVideo"),
+            ],
+            [
+                InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
+                InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
             ],
             [
                 InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
@@ -744,4 +765,80 @@ async def tidal_ng_dec_concurrency(c, cb: CallbackQuery):
         "downloads_concurrent_max",
         lambda prev: max(1, int(prev or 3) - 1)
     )
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleQualityAudio$"))
+async def tidal_ng_cycle_quality_audio(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH, CHOICE_KEYS
+        data = _read_json(JSON_PATH)
+        choices = CHOICE_KEYS.get('quality_audio') or ["LOW","HIGH","LOSSLESS","HI_RES_LOSSLESS"]
+        cur = str(data.get('quality_audio', 'HIGH'))
+        try:
+            idx = choices.index(cur)
+        except Exception:
+            idx = -1
+        newv = choices[(idx + 1) % len(choices)]
+        _backup(JSON_PATH)
+        data['quality_audio'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleQualityVideo$"))
+async def tidal_ng_cycle_quality_video(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH, CHOICE_KEYS
+        data = _read_json(JSON_PATH)
+        choices = CHOICE_KEYS.get('quality_video') or ["360","480","720","1080"]
+        cur = str(data.get('quality_video', '480'))
+        try:
+            idx = choices.index(cur)
+        except Exception:
+            idx = -1
+        newv = choices[(idx + 1) % len(choices)]
+        _backup(JSON_PATH)
+        data['quality_video'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleVideoDownload$"))
+async def tidal_ng_toggle_video_download(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        cur = bool(data.get('video_download', True))
+        data['video_download'] = (not cur)
+        _backup(JSON_PATH)
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleExtractFlac$"))
+async def tidal_ng_toggle_extract_flac(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        cur = bool(data.get('extract_flac', True))
+        data['extract_flac'] = (not cur)
+        _backup(JSON_PATH)
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
     await tidal_ng_cb(c, cb)
