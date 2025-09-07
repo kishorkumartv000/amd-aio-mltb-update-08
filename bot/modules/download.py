@@ -216,6 +216,15 @@ async def apple_flag_select_cb(c, cb):
             options['atmos'] = True
         else:
             return
+        # Acknowledge and close the selection message
+        try:
+            await c.answer_callback_query(cb.id)
+        except Exception:
+            pass
+        try:
+            await c.delete_messages(cb.message.chat.id, cb.message.id)
+        except Exception:
+            pass
         # Clear state
         await conversation_state.clear(cb.from_user.id)
 
@@ -289,6 +298,10 @@ async def apple_flag_cancel_cb(c, cb):
     except Exception:
         pass
     try:
-        await send_message(cb.message, "❌ Cancelled.")
+        await c.answer_callback_query(cb.id, "Cancelled", show_alert=False)
+    except Exception:
+        pass
+    try:
+        await c.delete_messages(cb.message.chat.id, cb.message.id)
     except Exception:
         pass
