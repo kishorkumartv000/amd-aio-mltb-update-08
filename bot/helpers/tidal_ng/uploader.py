@@ -1,6 +1,7 @@
 import os
 import shutil
 import asyncio
+import re
 from config import Config
 from bot.logger import LOGGER
 from bot.settings import bot_set
@@ -25,10 +26,32 @@ def _get_folder_size(folder_path: str) -> int:
 
 
 async def create_tidal_ng_zip(directory: str, user_id: int, metadata: dict) -> str:
-    """Create a zip file for Tidal NG content with a simple provider prefix."""
-    safe_title = (metadata.get('title') or 'Tidal_NG').strip().replace('/', '_')
+    """Create a zip file for Tidal NG content with provider-aware naming.
+
+    Examples:
+    - Album:     [Tidal NG] The_Album_Name.zip
+    - Playlist:  [Tidal NG] My_Playlist (Playlist).zip
+    - Artist:    [Tidal NG] Some_Artist (Artist).zip
+    - Video:     [Tidal NG] Some_Video (Video).zip
+    """
+    title = (metadata.get('title') or 'Tidal NG').strip()
+    # sanitize and convert spaces to underscores similar to Apple helper
+    safe_title = re.sub(r'[\\/*?:"<>|]', '', title).replace(' ', '_')
+    provider = 'Tidal NG'
+    ctype = (metadata.get('type') or 'album').strip().lower()
+
+    if ctype == 'album':
+        base = f"[{provider}] {safe_title}"
+    elif ctype == 'playlist':
+        base = f"[{provider}] {safe_title} (Playlist)"
+    elif ctype == 'artist':
+        base = f"[{provider}] {safe_title} (Artist)"
+    elif ctype == 'video':
+        base = f"[{provider}] {safe_title} (Video)"
+    else:
+        base = f"[{provider}] {safe_title}"
+
     zip_dir = os.path.dirname(directory)
-    base = f"[Tidal NG] {safe_title}"
     zip_path = os.path.join(zip_dir, f"{base}.zip")
     idx = 1
     while os.path.exists(zip_path):
@@ -262,16 +285,9 @@ async def album_upload(metadata, user):
     base_path = await _get_tidal_ng_base_path(user['user_id'])
     if bot_set.upload_mode == 'Telegram':
         if getattr(bot_set, 'album_zip', False):
-            total = _get_folder_size(metadata['folderpath'])
-            zip_paths = []
-            if total > MAX_SIZE:
-                # basic splitting for NG: send one folder per direct zip chunk using shutil.make_archive workaround
-                # to keep this light, just do a simple one-zip for now and let rclone handle large in RCLONE mode
-                zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
-                zip_paths = [zp]
-            else:
-                zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
-                zip_paths = [zp]
+            # Always create a single descriptive zip for Telegram mode
+            zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
+            zip_paths = [zp]
             caption = await format_string(
                 "💿 **{album}**\n👤 {artist}\n🎧 {provider}",
                 {
@@ -317,7 +333,6 @@ async def playlist_upload(metadata, user):
     base_path = await _get_tidal_ng_base_path(user['user_id'])
     if bot_set.upload_mode == 'Telegram':
         if getattr(bot_set, 'playlist_zip', False):
-            total = _get_folder_size(metadata['folderpath'])
             zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
             caption = await format_string(
                 "🎵 **{title}**\n👤 Curated by {artist}\n🎧 {provider} Playlist",
