@@ -110,16 +110,30 @@ async def apple_cb(c, cb: CallbackQuery):
         }
         current = Config.APPLE_DEFAULT_FORMAT
         formats[current] += ' ✅'
-        
+        # Build Apple panel buttons dynamically to include Apple-specific zip toggles
+        from ..settings import bot_set as _bs
+        zip_album_label = f"Zip Albums (Apple): {'ON ✅' if getattr(_bs, 'apple_album_zip', False) else 'OFF'}"
+        zip_playlist_label = f"Zip Playlists (Apple): {'ON ✅' if getattr(_bs, 'apple_playlist_zip', False) else 'OFF'}"
+
+        buttons = []
+        for fmt, label in formats.items():
+            buttons.append([InlineKeyboardButton(label, callback_data=f"appleF_{fmt}")])
+        buttons.append([InlineKeyboardButton("Quality Settings", callback_data="appleQ")])
+        buttons.append([
+            InlineKeyboardButton("🧩 Setup Wrapper", callback_data="appleSetup"),
+            InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
+        ])
+        buttons.append([
+            InlineKeyboardButton(zip_album_label, callback_data="appleToggleZipAlbum"),
+            InlineKeyboardButton(zip_playlist_label, callback_data="appleToggleZipPlaylist")
+        ])
+        buttons.append([InlineKeyboardButton("🔙 Back", callback_data="providerPanel")])
+
         await edit_message(
             cb.message,
             "🍎 **Apple Music Settings**\n\n"
-            "Use the buttons below to configure formats, quality, and manage the Wrapper service.\n\n"
-            "**Available Formats:**\n"
-            "- ALAC: Apple Lossless Audio Codec\n"
-            "- Dolby Atmos: Spatial audio experience\n\n"
-            "**Current Default Format:**",
-            apple_button(formats)
+            "Control formats, quality, wrapper, and Apple-specific zip behavior.",
+            InlineKeyboardMarkup(buttons)
         )
 
 
@@ -169,6 +183,32 @@ async def apple_set_quality_cb(c, cb: CallbackQuery):
         set_db.set_variable(f'APPLE_{format_type.upper()}_QUALITY', quality)
         setattr(Config, f'APPLE_{format_type.upper()}_QUALITY', quality)
         await apple_quality_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleZipAlbum$"))
+async def apple_toggle_zip_album(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_album_zip = not bool(getattr(bot_set, 'apple_album_zip', False))
+            set_db.set_variable('APPLE_ALBUM_ZIP', bot_set.apple_album_zip)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleZipPlaylist$"))
+async def apple_toggle_zip_playlist(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_playlist_zip = not bool(getattr(bot_set, 'apple_playlist_zip', False))
+            set_db.set_variable('APPLE_PLAYLIST_ZIP', bot_set.apple_playlist_zip)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
 
 
 # Apple Wrapper: Stop with confirmation

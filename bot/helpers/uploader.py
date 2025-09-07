@@ -162,7 +162,9 @@ async def album_upload(metadata, user):
     
     if bot_set.upload_mode == 'Telegram':
         reporter = user.get('progress')
-        if bot_set.album_zip:
+        # Use Apple-specific toggle; do not rely on core
+        use_zip = bool(getattr(bot_set, 'apple_album_zip', False))
+        if use_zip:
             # Decide zipping strategy based on folder size and Telegram limits
             total_size = _get_folder_size(metadata['folderpath'])
             zip_paths = []
@@ -337,7 +339,9 @@ async def playlist_upload(metadata, user):
     
     if bot_set.upload_mode == 'Telegram':
         reporter = user.get('progress')
-        if bot_set.playlist_zip:
+        # Use Apple-specific toggle; do not rely on core
+        use_zip = bool(getattr(bot_set, 'apple_playlist_zip', False))
+        if use_zip:
             # Decide zipping strategy based on size
             total_size = _get_folder_size(metadata['folderpath'])
             zip_paths = []
