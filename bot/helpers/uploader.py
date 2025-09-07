@@ -138,7 +138,7 @@ async def music_video_upload(metadata, user):
 
 def _get_folder_size(folder_path: str) -> int:
     total_size = 0
-    for root, _, files in os.walk(folderpath):
+    for root, _, files in os.walk(folder_path):
         for f in files:
             try:
                 total_size += os.path.getsize(os.path.join(root, f))

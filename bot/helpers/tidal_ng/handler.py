@@ -13,7 +13,7 @@ from bot.helpers.utils import (
     extract_audio_metadata,
     extract_video_metadata,
 )
-from bot.helpers.uploader import track_upload, album_upload, playlist_upload, music_video_upload
+from bot.helpers.tidal_ng.uploader import track_upload, album_upload, playlist_upload, music_video_upload
 from bot.helpers.tidal_ng.utils import get_tidal_ng_download_base_path
 
 # Define the path to the tidal-dl-ng CLI script
