@@ -153,8 +153,7 @@ async def apple_cb(c, cb: CallbackQuery):
         lab_song_fmt = f"Song File: {gv('song-file-format','{SongNumer}. {SongName}')}"
 
         buttons = []
-        # Interactive editing entry
-        buttons.append([InlineKeyboardButton("✏️ Interactive Edit (Apple)", callback_data="appleInteractive")])
+        # Interactive editing removed; use /config_set instead
         # Top-level guard toggle for cycling presets
         try:
             from ..settings import bot_set as _bs_guard
@@ -260,138 +259,7 @@ async def apple_cb(c, cb: CallbackQuery):
         )
 
 
-@Client.on_callback_query(filters.regex(pattern=r"^appleInteractive$"))
-async def apple_interactive_menu(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True): return
-    def _rows(selected: str | None = None):
-        def lab(txt: str, key: str) -> list:
-            disp = f"{txt} ✅" if selected == key else txt
-            return [InlineKeyboardButton(disp, callback_data=f"applePromptYaml|{key}")]
-        rows = [
-            lab("Set media-user-token", "media-user-token"),
-            lab("Set authorization-token", "authorization-token"),
-            lab("Set storefront", "storefront"),
-            lab("Set language", "language"),
-            lab("Set cover-size", "cover-size"),
-            lab("Set album-folder-format", "album-folder-format"),
-            lab("Set playlist-folder-format", "playlist-folder-format"),
-            lab("Set song-file-format", "song-file-format"),
-            [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
-        ]
-        return rows
-    try:
-        await c.answer_callback_query(cb.id)
-    except Exception:
-        pass
-    # Create a separate interactive message and remember its id
-    try:
-        # delete previous interactive if any
-        state = await conversation_state.get(cb.from_user.id) or {}
-        old_id = (state.get('data') or {}).get('apple_menu_msg_id')
-        if old_id:
-            try:
-                await c.delete_messages(cb.message.chat.id, int(old_id))
-            except Exception:
-                pass
-    except Exception:
-        pass
-    m = await c.send_message(cb.message.chat.id, "Send a value for the selected key.", reply_markup=InlineKeyboardMarkup(_rows()))
-    await conversation_state.update(cb.from_user.id, stage='apple_yaml_menu', apple_menu_msg_id=m.id)
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^applePromptYaml\|"))
-async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True): return
-    try:
-        key = cb.data.split("|", 1)[1]
-    except Exception:
-        key = None
-    if not key:
-        return await apple_interactive_menu(c, cb)
-    # Record expected key in conversation state (preserve interactive menu msg id if present)
-    prev = await conversation_state.get(cb.from_user.id) or {}
-    menu_id = (prev.get('data') or {}).get('apple_menu_msg_id')
-    await conversation_state.start(cb.from_user.id, "apple_yaml_set", {
-        "key": key,
-        "chat_id": cb.message.chat.id,
-        "apple_menu_msg_id": menu_id
-    })
-    try:
-        await c.answer_callback_query(cb.id)
-    except Exception:
-        pass
-    # Visual feedback: tick the selected item in the interactive list (separate message)
-    try:
-        st = await conversation_state.get(cb.from_user.id) or {}
-        menu_id = (st.get('data') or {}).get('apple_menu_msg_id')
-        target_msg = cb.message
-        if menu_id and (str(menu_id).isdigit()):
-            try:
-                target_msg = await c.get_messages(cb.message.chat.id, int(menu_id))
-            except Exception:
-                target_msg = cb.message
-        def _rows(selected: str | None = None):
-            def lab(txt: str, k: str) -> list:
-                disp = f"{txt} ✅" if selected == k else txt
-                return [InlineKeyboardButton(disp, callback_data=f"applePromptYaml|{k}")]
-            rows = [
-                lab("Set media-user-token", "media-user-token"),
-                lab("Set authorization-token", "authorization-token"),
-                lab("Set storefront", "storefront"),
-                lab("Set language", "language"),
-                lab("Set cover-size", "cover-size"),
-                lab("Set album-folder-format", "album-folder-format"),
-                lab("Set playlist-folder-format", "playlist-folder-format"),
-                lab("Set song-file-format", "song-file-format"),
-                [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
-            ]
-            return rows
-        await edit_message(target_msg, "Send a value for the selected key.", InlineKeyboardMarkup(_rows(selected=key)))
-    except Exception:
-        pass
-    # Send a separate prompt message so the panel does not change back unexpectedly
-    await c.send_message(
-        cb.message.chat.id,
-        f"Please send a value for <code>{key}</code>.\nYou can /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="appleP")]])
-    )
-
-
-@Client.on_message(filters.text, group=13)
-async def apple_handle_yaml_value(c: Client, msg: Message):
-    from ..helpers.state import conversation_state as cs
-    st = await cs.get(msg.from_user.id)
-    if not st or st.get("stage") != "apple_yaml_set":
-        return
-    key = (st.get("data") or {}).get("key")
-    if not key:
-        await cs.clear(msg.from_user.id)
-        return
-    val = (msg.text or "").strip()
-    try:
-        # Quote sensitive keys
-        try:
-            from .config_yaml import SENSITIVE_KEYS
-            if key in SENSITIVE_KEYS and not (val.startswith('"') or val.startswith("'")):
-                val = f'"{val}"'
-        except Exception:
-            pass
-        from .provider_settings import _yaml_set as __set  # self-import safe in runtime context
-    except Exception:
-        # Fallback import path
-        pass
-    # Use local helper directly
-    try:
-        _yaml_set(key, val)
-        await send_message(msg, f"✅ Set <code>{key}</code>.")
-        # Refresh Apple panel quickly
-        try:
-            await apple_cb(c, Message(id=msg.id, chat=msg.chat))
-        except Exception:
-            pass
-    except Exception as e:
-        await send_message(msg, f"❌ Failed to set <code>{key}</code>: {e}")
-    await cs.clear(msg.from_user.id)
+    # Interactive editing removed; use /config_set instead
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^appleF"))
