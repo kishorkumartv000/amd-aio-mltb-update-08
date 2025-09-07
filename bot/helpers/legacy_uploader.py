@@ -22,8 +22,6 @@ async def track_upload(metadata, user, disable_link=False):
         rclone_link, index_link, remote_info = await rclone_upload(user, metadata['filepath'])
         if not disable_link:
             await post_simple_message(user, metadata, rclone_link, index_link)
-        if remote_info:
-            await _post_rclone_manage_button(user, remote_info)
 
     try:
         os.remove(metadata['filepath'])
@@ -52,8 +50,6 @@ async def album_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
-        if remote_info:
-            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -78,8 +74,6 @@ async def artist_upload(metadata, user):
                 pass
         else:
             await post_simple_message(user, metadata, rclone_link, index_link)
-        if remote_info:
-            await _post_rclone_manage_button(user, remote_info)
 
     await cleanup(None, metadata)
 
@@ -112,8 +106,6 @@ async def playlist_upload(metadata, user):
                         rclone_link, index_link, remote_info = await rclone_upload(user, track['filepath'])
                         if not bot_set.disable_sort_link:
                             await post_simple_message(user, track, rclone_link, index_link)
-                        if remote_info:
-                            await _post_rclone_manage_button(user, remote_info)
                     except ValueError: # might try to upload track which is not available
                         pass
         else:
