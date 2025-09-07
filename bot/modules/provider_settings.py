@@ -245,6 +245,10 @@ async def apple_cb(c, cb: CallbackQuery):
         buttons.append([
             InlineKeyboardButton(flag_label, callback_data="appleToggleFlagsPopup")
         ])
+        # Update media-user-token flow
+        buttons.append([
+            InlineKeyboardButton("🔐 Update media-user-token", callback_data="appleUpdateMediaUserToken")
+        ])
         buttons.append([
             InlineKeyboardButton(lab_language, callback_data="applePromptLanguage"),
             InlineKeyboardButton(lab_storefront, callback_data="applePromptStorefront"),
@@ -369,6 +373,16 @@ async def apple_cycle_cover_size(c: Client, cb: CallbackQuery):
         pass
     await apple_cb(c, cb)
 
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleUpdateMediaUserToken$"))
+async def apple_update_media_user_token(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": "media-user-token", "chat_id": cb.message.chat.id})
+        await edit_message(cb.message, "Send your <code>media-user-token</code> as a message now. You can /cancel to abort.")
+    except Exception:
+        pass
 
 @Client.on_callback_query(filters.regex(pattern=r"^appleToggleFlagsPopup$"))
 async def apple_toggle_flags_popup(c: Client, cb: CallbackQuery):
@@ -1059,7 +1073,6 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             guard_enabled = True
 
         buttons = [
-            [InlineKeyboardButton("✏️ Interactive Edit (Tidal NG)", callback_data="tidalNgInteractive")],
             [InlineKeyboardButton(guard_label, callback_data="tidalNgTogglePresetGuard")],
             [
                 InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),

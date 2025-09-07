@@ -47,6 +47,11 @@ def _write_yaml_lines(path: str, lines: list[str]) -> None:
     with open(tmp_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
     # atomic replace
+    # Ensure parent dir exists
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    except Exception:
+        pass
     os.replace(tmp_path, path)
 
 
