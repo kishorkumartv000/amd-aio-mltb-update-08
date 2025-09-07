@@ -443,6 +443,15 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         qv_label = f"Video Quality: {_qv}"
         vd_label = f"Video Download: {'ON ✅' if bool(_cfg.get('video_download', True)) else 'OFF'}"
         xf_label = f"Extract FLAC: {'ON ✅' if bool(_cfg.get('extract_flac', True)) else 'OFF'}"
+        mp4_label = f"Convert to MP4: {'ON ✅' if bool(_cfg.get('video_convert_mp4', True)) else 'OFF'}"
+        se_label = f"Skip Existing: {'ON ✅' if bool(_cfg.get('skip_existing', True)) else 'OFF'}"
+        st_label = f"Symlink to Track: {'ON ✅' if bool(_cfg.get('symlink_to_track', False)) else 'OFF'}"
+        pc_label = f"Playlist Create: {'ON ✅' if bool(_cfg.get('playlist_create', False)) else 'OFF'}"
+        dsp_min = float(_cfg.get('download_delay_sec_min', 3.0) or 3.0)
+        dsp_max = float(_cfg.get('download_delay_sec_max', 5.0) or 5.0)
+        delay_label = f"Delay: {dsp_min:.1f}/{dsp_max:.1f}s"
+        sim_label = f"Sim per Track: {int(_cfg.get('downloads_simultaneous_per_track_max', 20) or 20)}"
+        pad_label = f"Track Pad Min: {int(_cfg.get('album_track_num_pad_min', 1) or 1)}"
         le_label = f"Lyrics Embed: {'ON ✅' if bool(_cfg.get('lyrics_embed', False)) else 'OFF'}"
         lf_label = f"Lyrics File: {'ON ✅' if bool(_cfg.get('lyrics_file', False)) else 'OFF'}"
         rg_label = f"Replay Gain: {'ON ✅' if bool(_cfg.get('metadata_replay_gain', True)) else 'OFF'}"
@@ -471,6 +480,22 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton(vd_label, callback_data="tidalNgToggleVideoDownload"),
                 InlineKeyboardButton(xf_label, callback_data="tidalNgToggleExtractFlac"),
+            ],
+            [
+                InlineKeyboardButton(mp4_label, callback_data="tidalNgToggleConvertMp4"),
+                InlineKeyboardButton(se_label, callback_data="tidalNgToggleSkipExisting"),
+            ],
+            [
+                InlineKeyboardButton(st_label, callback_data="tidalNgToggleSymlink"),
+                InlineKeyboardButton(pc_label, callback_data="tidalNgTogglePlaylistCreate"),
+            ],
+            [
+                InlineKeyboardButton(delay_label, callback_data="tidalNgCycleDelay"),
+                InlineKeyboardButton(sim_label, callback_data="tidalNgCycleSimPerTrack"),
+            ],
+            [
+                InlineKeyboardButton(pad_label, callback_data="tidalNgCycleTrackPad"),
+                InlineKeyboardButton("Reset Delays", callback_data="tidalNgResetDelay"),
             ],
             [
                 InlineKeyboardButton(le_label, callback_data="tidalNgToggleLyricsEmbed"),
@@ -937,6 +962,127 @@ async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
         newv = sizes[(idx + 1) % len(sizes)]
         _backup(JSON_PATH)
         data['metadata_cover_dimension'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleConvertMp4$"))
+async def tidal_ng_toggle_convert_mp4(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('video_convert_mp4')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleSkipExisting$"))
+async def tidal_ng_toggle_skip_existing(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('skip_existing')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleSymlink$"))
+async def tidal_ng_toggle_symlink(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('symlink_to_track')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgTogglePlaylistCreate$"))
+async def tidal_ng_toggle_playlist_create(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        _toggle_json_bool('playlist_create')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleDelay$"))
+async def tidal_ng_cycle_delay(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        presets = [(1.0, 2.0), (3.0, 5.0), (5.0, 10.0), (0.0, 0.0)]
+        cur = (float(data.get('download_delay_sec_min', 3.0) or 3.0), float(data.get('download_delay_sec_max', 5.0) or 5.0))
+        try:
+            idx = presets.index(cur)
+        except Exception:
+            idx = -1
+        newv = presets[(idx + 1) % len(presets)]
+        _backup(JSON_PATH)
+        data['download_delay'] = (newv != (0.0, 0.0))
+        data['download_delay_sec_min'] = newv[0]
+        data['download_delay_sec_max'] = newv[1]
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgResetDelay$"))
+async def tidal_ng_reset_delay(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        _backup(JSON_PATH)
+        data['download_delay'] = True
+        data['download_delay_sec_min'] = 3.0
+        data['download_delay_sec_max'] = 5.0
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleSimPerTrack$"))
+async def tidal_ng_cycle_sim_per_track(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        options = [8, 12, 16, 20, 24]
+        cur = int(data.get('downloads_simultaneous_per_track_max', 20) or 20)
+        try:
+            idx = options.index(cur)
+        except Exception:
+            idx = -1
+        newv = options[(idx + 1) % len(options)]
+        _backup(JSON_PATH)
+        data['downloads_simultaneous_per_track_max'] = newv
+        _write_json(JSON_PATH, data)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleTrackPad$"))
+async def tidal_ng_cycle_track_pad(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        options = [1, 2, 3]
+        cur = int(data.get('album_track_num_pad_min', 1) or 1)
+        try:
+            idx = options.index(cur)
+        except Exception:
+            idx = -1
+        newv = options[(idx + 1) % len(options)]
+        _backup(JSON_PATH)
+        data['album_track_num_pad_min'] = newv
         _write_json(JSON_PATH, data)
     except Exception:
         pass
