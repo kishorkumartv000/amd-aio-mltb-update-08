@@ -263,18 +263,23 @@ async def apple_cb(c, cb: CallbackQuery):
 @Client.on_callback_query(filters.regex(pattern=r"^appleInteractive$"))
 async def apple_interactive_menu(c: Client, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True): return
-    rows = [
-        [InlineKeyboardButton("Set media-user-token", callback_data="applePromptYaml|media-user-token")],
-        [InlineKeyboardButton("Set authorization-token", callback_data="applePromptYaml|authorization-token")],
-        [InlineKeyboardButton("Set storefront", callback_data="applePromptYaml|storefront")],
-        [InlineKeyboardButton("Set language", callback_data="applePromptYaml|language")],
-        [InlineKeyboardButton("Set cover-size", callback_data="applePromptYaml|cover-size")],
-        [InlineKeyboardButton("Set album-folder-format", callback_data="applePromptYaml|album-folder-format")],
-        [InlineKeyboardButton("Set playlist-folder-format", callback_data="applePromptYaml|playlist-folder-format")],
-        [InlineKeyboardButton("Set song-file-format", callback_data="applePromptYaml|song-file-format")],
-        [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
-    ]
-    await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(rows))
+    def _rows(selected: str | None = None):
+        def lab(txt: str, key: str) -> list:
+            disp = f"{txt} ✅" if selected == key else txt
+            return [InlineKeyboardButton(disp, callback_data=f"applePromptYaml|{key}")]
+        rows = [
+            lab("Set media-user-token", "media-user-token"),
+            lab("Set authorization-token", "authorization-token"),
+            lab("Set storefront", "storefront"),
+            lab("Set language", "language"),
+            lab("Set cover-size", "cover-size"),
+            lab("Set album-folder-format", "album-folder-format"),
+            lab("Set playlist-folder-format", "playlist-folder-format"),
+            lab("Set song-file-format", "song-file-format"),
+            [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
+        ]
+        return rows
+    await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(_rows()))
 
 
 @Client.on_callback_query(filters.regex(pattern=r"^applePromptYaml\|"))
@@ -290,6 +295,27 @@ async def apple_prompt_yaml(c: Client, cb: CallbackQuery):
     await conversation_state.start(cb.from_user.id, "apple_yaml_set", {"key": key, "chat_id": cb.message.chat.id})
     try:
         await c.answer_callback_query(cb.id)
+    except Exception:
+        pass
+    # Visual feedback: tick the selected item in the interactive list
+    try:
+        def _rows(selected: str | None = None):
+            def lab(txt: str, k: str) -> list:
+                disp = f"{txt} ✅" if selected == k else txt
+                return [InlineKeyboardButton(disp, callback_data=f"applePromptYaml|{k}")]
+            rows = [
+                lab("Set media-user-token", "media-user-token"),
+                lab("Set authorization-token", "authorization-token"),
+                lab("Set storefront", "storefront"),
+                lab("Set language", "language"),
+                lab("Set cover-size", "cover-size"),
+                lab("Set album-folder-format", "album-folder-format"),
+                lab("Set playlist-folder-format", "playlist-folder-format"),
+                lab("Set song-file-format", "song-file-format"),
+                [InlineKeyboardButton("🔙 Back", callback_data="appleP")]
+            ]
+            return rows
+        await edit_message(cb.message, "Send a value for the selected key.", InlineKeyboardMarkup(_rows(selected=key)))
     except Exception:
         pass
     # Send a separate prompt message so the panel does not change back unexpectedly
