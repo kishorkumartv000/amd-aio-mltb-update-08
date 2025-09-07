@@ -219,6 +219,15 @@ async def apple_cb(c, cb: CallbackQuery):
             InlineKeyboardButton(lab_atmos_max, callback_data="appleCycleAtmosMax"),
             InlineKeyboardButton(lab_m3u8_mode, callback_data="appleCycleM3u8Mode"),
         ])
+        # Apple flags popup toggle
+        try:
+            from ..settings import bot_set as _bs2
+            flag_label = f"Flags Popup: {'ON ✅' if getattr(_bs2, 'apple_flags_popup', False) else 'OFF'}"
+        except Exception:
+            flag_label = "Flags Popup: OFF"
+        buttons.append([
+            InlineKeyboardButton(flag_label, callback_data="appleToggleFlagsPopup")
+        ])
         buttons.append([
             InlineKeyboardButton(lab_language, callback_data="applePromptLanguage"),
             InlineKeyboardButton(lab_storefront, callback_data="applePromptStorefront"),
@@ -403,6 +412,18 @@ async def apple_cycle_cover_size(c: Client, cb: CallbackQuery):
         pass
     await apple_cb(c, cb)
 
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleToggleFlagsPopup$"))
+async def apple_toggle_flags_popup(c: Client, cb: CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            from ..settings import bot_set
+            from ..helpers.database.pg_impl import set_db
+            bot_set.apple_flags_popup = not bool(getattr(bot_set, 'apple_flags_popup', False))
+            set_db.set_variable('APPLE_FLAGS_POPUP', bot_set.apple_flags_popup)
+        except Exception:
+            pass
+        await apple_cb(c, cb)
 
 @Client.on_callback_query(filters.regex(pattern=r"^appleCycleCoverFormat$"))
 async def apple_cycle_cover_format(c: Client, cb: CallbackQuery):
