@@ -426,6 +426,11 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             "Use `/tidal_ng_config` for more help.\n\n"
             "You can also use the buttons below for other actions."
         )
+        # Inject Tidal NG specific zip toggles
+        from ..settings import bot_set as _bs
+        zip_album_label = f"Zip Albums (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_album_zip', False) else 'OFF'}"
+        zip_playlist_label = f"Zip Playlists (NG): {'ON ✅' if getattr(_bs, 'tidal_ng_playlist_zip', False) else 'OFF'}"
+
         buttons = [
             [
                 InlineKeyboardButton("🔑 Login", callback_data="tidalNgLogin"),
@@ -434,6 +439,10 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
                 InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
+            ],
+            [
+                InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
+                InlineKeyboardButton(zip_playlist_label, callback_data="tidalNgToggleZipPlaylist")
             ],
             [InlineKeyboardButton("🔙 Back", callback_data="providerPanel")]
         ]
@@ -680,3 +689,31 @@ async def tidal_ng_logout_cb(c, cb: CallbackQuery):
             f"An unexpected error occurred while trying to log out.\n\n"
             f"`{str(e)}`"
         )
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleZipAlbum$"))
+async def tidal_ng_toggle_zip_album(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from ..settings import bot_set
+        from ..helpers.database.pg_impl import set_db
+        bot_set.tidal_ng_album_zip = not bool(getattr(bot_set, 'tidal_ng_album_zip', False))
+        set_db.set_variable('TIDAL_NG_ALBUM_ZIP', bot_set.tidal_ng_album_zip)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleZipPlaylist$"))
+async def tidal_ng_toggle_zip_playlist(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+    try:
+        from ..settings import bot_set
+        from ..helpers.database.pg_impl import set_db
+        bot_set.tidal_ng_playlist_zip = not bool(getattr(bot_set, 'tidal_ng_playlist_zip', False))
+        set_db.set_variable('TIDAL_NG_PLAYLIST_ZIP', bot_set.tidal_ng_playlist_zip)
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
