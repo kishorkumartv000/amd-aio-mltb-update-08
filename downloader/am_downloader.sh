@@ -5,8 +5,8 @@ set -e
 # Configuration
 USE_FALLBACK=false         # true = use original fallback logic
 USE_CUSTOM_GO=false        # true = force custom Go path only
-USE_SYSTEM_GO=false         # true = force system Go path only
-USE_BINARY_EXECUTION=true # true = use compiled binary, false = use go run main.go
+USE_SYSTEM_GO=false        # true = force system Go path only
+USE_BINARY_EXECUTION=true  # true = use compiled binary, false = use go run main.go
 CUSTOM_BINARY_NAME=am_downloader  # name of the compiled binary
 
 # Fallback paths
@@ -25,7 +25,6 @@ if [ "$USE_FALLBACK" = true ]; then
         echo "Using Go from system environment: $(command -v go)"
     else
         echo "❌ Go compiler not found in custom or system paths."
-        echo "Please run the installer script to set up Go correctly."
         exit 1
     fi
 else
@@ -37,22 +36,21 @@ else
         echo "Using Go from system path (forced): $SYSTEM_GO_BIN"
     else
         echo "❌ Go compiler not found or no path selected."
-        echo "Please check your flags or run the installer script."
         exit 1
     fi
 fi
 
-# Change to Go project directory
-cd "$HOME/amalac"
-
 # Build the download command
 if [ "$USE_BINARY_EXECUTION" = true ]; then
+    # 🚀 Run compiled binary directly, no need to cd
     cmd=(
         /usr/local/bin/$CUSTOM_BINARY_NAME
         "$@"
     )
     echo "Executing via compiled binary: $CUSTOM_BINARY_NAME"
 else
+    # 🛠️ For go run, must cd into project dir
+    cd "$HOME/amalac"
     cmd=(
         go run main.go
         "$@"
