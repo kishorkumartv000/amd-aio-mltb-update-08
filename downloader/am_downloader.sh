@@ -1,22 +1,68 @@
 #!/bin/bash
-# Apple Music Downloader - Simplified Version
+# Apple Music Downloader - Resilient Version with Go Fallback + Path Control + Binary Execution Option
 set -e
 
-# Explicitly add Go to PATH
-export PATH="$PATH:/usr/local/go/bin"
+# Configuration
+USE_FALLBACK=false         # true = use original fallback logic
+USE_CUSTOM_GO=false        # true = force custom Go path only
+USE_SYSTEM_GO=false         # true = force system Go path only
+USE_BINARY_EXECUTION=true # true = use compiled binary, false = use go run main.go
+CUSTOM_BINARY_NAME=am_downloader  # name of the compiled binary
+
+# Fallback paths
+CUSTOM_GO_BIN="$HOME/go-sdk/go/bin"
+SYSTEM_GO_BIN="/usr/local/go/bin"
+
+# Select Go path
+if [ "$USE_FALLBACK" = true ]; then
+    if [ -x "$CUSTOM_GO_BIN/go" ]; then
+        export PATH="$PATH:$CUSTOM_GO_BIN"
+        echo "Using Go from custom path (fallback): $CUSTOM_GO_BIN"
+    elif [ -x "$SYSTEM_GO_BIN/go" ]; then
+        export PATH="$PATH:$SYSTEM_GO_BIN"
+        echo "Using Go from system path (fallback): $SYSTEM_GO_BIN"
+    elif command -v go >/dev/null 2>&1; then
+        echo "Using Go from system environment: $(command -v go)"
+    else
+        echo "❌ Go compiler not found in custom or system paths."
+        echo "Please run the installer script to set up Go correctly."
+        exit 1
+    fi
+else
+    if [ "$USE_CUSTOM_GO" = true ] && [ -x "$CUSTOM_GO_BIN/go" ]; then
+        export PATH="$PATH:$CUSTOM_GO_BIN"
+        echo "Using Go from custom path (forced): $CUSTOM_GO_BIN"
+    elif [ "$USE_SYSTEM_GO" = true ] && [ -x "$SYSTEM_GO_BIN/go" ]; then
+        export PATH="$PATH:$SYSTEM_GO_BIN"
+        echo "Using Go from system path (forced): $SYSTEM_GO_BIN"
+    else
+        echo "❌ Go compiler not found or no path selected."
+        echo "Please check your flags or run the installer script."
+        exit 1
+    fi
+fi
 
 # Change to Go project directory
 cd "$HOME/amalac"
 
 # Build the download command
-cmd=(
-    go run main.go
-    "$@"
-)
+if [ "$USE_BINARY_EXECUTION" = true ]; then
+    cmd=(
+        /usr/local/bin/$CUSTOM_BINARY_NAME
+        "$@"
+    )
+    echo "Executing via compiled binary: $CUSTOM_BINARY_NAME"
+else
+    cmd=(
+        go run main.go
+        "$@"
+    )
+    echo "Executing via Go source: main.go"
+fi
 
 # Execute download
 echo "Starting Apple Music download..."
 "${cmd[@]}"
 
 # Output success message
-echo "Download completed successfully!"
+echo "✅ Download completed successfully!"
