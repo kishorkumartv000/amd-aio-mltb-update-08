@@ -1095,6 +1095,8 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         rg_label = f"Replay Gain: {'ON ✅' if bool(_cfg.get('metadata_replay_gain', True)) else 'OFF'}"
         ce_label = f"Cover Embed: {'ON ✅' if bool(_cfg.get('metadata_cover_embed', True)) else 'OFF'}"
         caf_label = f"Cover File: {'ON ✅' if bool(_cfg.get('cover_album_file', True)) else 'OFF'}"
+        mcd = int(_cfg.get('metadata_cover_dimension', 320) or 320)
+        mcd_label = f"Cover Size: {mcd}"
 
         # Top-level guard toggle for Tidal NG preset cycling
         try:
@@ -1114,9 +1116,6 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
             [
                 InlineKeyboardButton("📂 Import Config File", callback_data="tidalNg_importFile"),
                 InlineKeyboardButton("⚙️ Execute cfg", callback_data="tidal_ng_execute_cfg")
-            ],
-            [
-                InlineKeyboardButton("🗑️ Manage Files", callback_data="tidalNgManageFiles")
             ],
         ]
 
@@ -1164,6 +1163,7 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 ],
                 [
                     InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
+                    InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
                 ],
                 [
                     InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
@@ -1416,139 +1416,6 @@ async def tidal_ng_logout_cb(c, cb: CallbackQuery):
         )
 
 
-@Client.on_callback_query(filters.regex(pattern=r"^tidalNgManageFiles$"))
-async def tidal_ng_manage_files_cb(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True):
-        return
-
-    config_dirs = ["/root/.config/tidal_dl_ng/", "/root/.config/tidal_dl_ng-dev/"]
-    all_files = []
-    for directory in config_dirs:
-        if os.path.isdir(directory):
-            try:
-                for filename in os.listdir(directory):
-                    filepath = os.path.join(directory, filename)
-                    if os.path.isfile(filepath):
-                        all_files.append(filepath)
-            except OSError:
-                pass
-
-    buttons = []
-    text = "Found the following configuration files.\nSelect a file to delete:"
-
-    if not all_files:
-        text = "No configuration files found."
-    else:
-        for f_path in all_files:
-            # Use a short prefix and a safe separator to stay within callback data limits
-            callback_data = f"tnfa:{f_path}"
-            parent_dir = os.path.basename(os.path.dirname(f_path))
-            file_name_display = f"{parent_dir}/{os.path.basename(f_path)}"
-            buttons.append([InlineKeyboardButton(f"📄 {file_name_display}", callback_data=callback_data)])
-
-    buttons.append([InlineKeyboardButton("🔙 Back", callback_data="tidalNgP")])
-
-    await edit_message(
-        cb.message,
-        text,
-        InlineKeyboardMarkup(buttons)
-    )
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^tnfa:"))
-async def tidal_ng_file_action_cb(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True):
-        return
-
-    try:
-        filepath = cb.data.split(":", 1)[1]
-    except IndexError:
-        await cb.answer("Error: Invalid file path in callback.", show_alert=True)
-        return
-
-    filename = os.path.basename(filepath)
-    text = f"Choose an action for file:\n`{filename}`"
-
-    buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("⬇️ Download", callback_data=f"tndl:{filepath}"),
-            InlineKeyboardButton("❌ Delete", callback_data=f"tndc:{filepath}")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="tidalNgManageFiles")
-        ]
-    ])
-
-    await edit_message(cb.message, text, buttons)
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^tndc:"))
-async def tidal_ng_delete_confirm_cb(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True):
-        return
-
-    try:
-        filepath = cb.data.split(":", 1)[1]
-    except IndexError:
-        await cb.answer("Error: Invalid file path in callback.", show_alert=True)
-        return
-
-    filename = os.path.basename(filepath)
-    text = f"Are you sure you want to delete the file `{filename}`?\n\n**This action cannot be undone.**"
-
-    buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Confirm Delete", callback_data=f"tndd:{filepath}"),
-            InlineKeyboardButton("❌ Cancel", callback_data="tidalNgManageFiles")
-        ]
-    ])
-
-    await edit_message(cb.message, text, buttons)
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^tndd:"))
-async def tidal_ng_delete_do_cb(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True):
-        return
-
-    try:
-        filepath = cb.data.split(":", 1)[1]
-    except IndexError:
-        await cb.answer("Error: Invalid file path in callback.", show_alert=True)
-        return
-
-    try:
-        if os.path.isfile(filepath):
-            os.remove(filepath)
-            await cb.answer("File deleted successfully.", show_alert=False)
-        else:
-            await cb.answer("File not found.", show_alert=True)
-    except Exception as e:
-        await cb.answer(f"Error: {e}", show_alert=True)
-
-    # Refresh the file list
-    await tidal_ng_manage_files_cb(c, cb)
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^tndl:"))
-async def tidal_ng_download_file_cb(c: Client, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True):
-        return
-
-    await cb.answer("Preparing your file...")
-    try:
-        filepath = cb.data.split(":", 1)[1]
-        if os.path.isfile(filepath):
-            await c.send_document(
-                chat_id=cb.message.chat.id,
-                document=filepath
-            )
-        else:
-            await c.send_message(cb.message.chat.id, "Error: File not found.")
-    except Exception as e:
-        await c.send_message(cb.message.chat.id, f"An error occurred while sending the file: {e}")
-
-
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNgToggleZipAlbum$"))
 async def tidal_ng_toggle_zip_album(c, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True):
@@ -1742,6 +1609,27 @@ async def tidal_ng_toggle_cover_file(c, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True): return
     try:
         _toggle_json_bool('cover_album_file')
+    except Exception:
+        pass
+    await tidal_ng_cb(c, cb)
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleCoverSize$"))
+async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True): return
+    try:
+        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
+        data = _read_json(JSON_PATH)
+        sizes = [320, 640, 1280]
+        cur = int(data.get('metadata_cover_dimension', 320) or 320)
+        try:
+            idx = sizes.index(cur)
+        except Exception:
+            idx = -1
+        newv = sizes[(idx + 1) % len(sizes)]
+        _backup(JSON_PATH)
+        data['metadata_cover_dimension'] = newv
+        _write_json(JSON_PATH, data)
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
