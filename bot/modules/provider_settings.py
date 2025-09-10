@@ -1095,8 +1095,6 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
         rg_label = f"Replay Gain: {'ON ✅' if bool(_cfg.get('metadata_replay_gain', True)) else 'OFF'}"
         ce_label = f"Cover Embed: {'ON ✅' if bool(_cfg.get('metadata_cover_embed', True)) else 'OFF'}"
         caf_label = f"Cover File: {'ON ✅' if bool(_cfg.get('cover_album_file', True)) else 'OFF'}"
-        mcd = int(_cfg.get('metadata_cover_dimension', 320) or 320)
-        mcd_label = f"Cover Size: {mcd}"
 
         # Top-level guard toggle for Tidal NG preset cycling
         try:
@@ -1166,7 +1164,6 @@ async def tidal_ng_cb(c, cb: CallbackQuery):
                 ],
                 [
                     InlineKeyboardButton(caf_label, callback_data="tidalNgToggleCoverFile"),
-                    InlineKeyboardButton(mcd_label, callback_data="tidalNgCycleCoverSize"),
                 ],
                 [
                     InlineKeyboardButton(zip_album_label, callback_data="tidalNgToggleZipAlbum"),
@@ -1745,27 +1742,6 @@ async def tidal_ng_toggle_cover_file(c, cb: CallbackQuery):
     if not await check_user(cb.from_user.id, restricted=True): return
     try:
         _toggle_json_bool('cover_album_file')
-    except Exception:
-        pass
-    await tidal_ng_cb(c, cb)
-
-
-@Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleCoverSize$"))
-async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True): return
-    try:
-        from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
-        data = _read_json(JSON_PATH)
-        sizes = [320, 640, 1280]
-        cur = int(data.get('metadata_cover_dimension', 320) or 320)
-        try:
-            idx = sizes.index(cur)
-        except Exception:
-            idx = -1
-        newv = sizes[(idx + 1) % len(sizes)]
-        _backup(JSON_PATH)
-        data['metadata_cover_dimension'] = newv
-        _write_json(JSON_PATH, data)
     except Exception:
         pass
     await tidal_ng_cb(c, cb)
