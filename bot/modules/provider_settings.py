@@ -1616,10 +1616,17 @@ async def tidal_ng_toggle_cover_file(c, cb: CallbackQuery):
 
 @Client.on_callback_query(filters.regex(pattern=r"^tidalNgCycleCoverSize$"))
 async def tidal_ng_cycle_cover_size(c, cb: CallbackQuery):
-    if not await check_user(cb.from_user.id, restricted=True): return
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
     try:
         from .tidal_ng_settings import _read_json, _write_json, _backup, JSON_PATH
         data = _read_json(JSON_PATH)
+        if not data:
+            await cb.answer(
+                "Config file not found. Please use 'Execute cfg' first to generate it.",
+                show_alert=True,
+            )
+            return
         sizes = [320, 640, 1000, 2000, 5000]
         cur = int(data.get('metadata_cover_dimension', 320) or 320)
         try:
