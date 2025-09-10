@@ -60,6 +60,41 @@ async def handle_tidal_ng_config_upload(c: Client, msg: Message):
         await conversation_state.clear(user_id)
 
 
+# Custom filter for apple_yaml_set stage
+async def is_awaiting_apple_yaml_filter(_, __, message: Message):
+    if not message.from_user:
+        return False
+    state = await conversation_state.get(message.from_user.id)
+    return state and state.get('stage') == "apple_yaml_set"
+
+@Client.on_message(filters.text & filters.private & filters.create(is_awaiting_apple_yaml_filter), group=-2)
+async def handle_apple_yaml_set(c: Client, msg: Message):
+    user_id = msg.from_user.id
+    state = await conversation_state.get(user_id)
+    key_to_set = state.get('data', {}).get('key')
+
+    if not key_to_set:
+        await msg.reply_text("❌ An error occurred. The key to set was not found. Please start over.")
+        await conversation_state.clear(user_id)
+        return
+
+    value_to_set = msg.text.strip()
+
+    # Handle cancellation
+    if value_to_set.lower() == "/cancel":
+        await conversation_state.clear(user_id)
+        await msg.reply_text("✅ Operation cancelled.")
+        return
+
+    try:
+        _yaml_set(key_to_set, value_to_set)
+        await msg.reply_text(f"✅ Successfully updated <code>{key_to_set}</code>.")
+    except Exception as e:
+        await msg.reply_text(f"❌ An error occurred while updating the configuration: {e}")
+    finally:
+        await conversation_state.clear(user_id)
+
+
 @Client.on_callback_query(filters.regex(pattern=r"^providerPanel"))
 async def provider_cb(c, cb: CallbackQuery):
     if await check_user(cb.from_user.id, restricted=True):
