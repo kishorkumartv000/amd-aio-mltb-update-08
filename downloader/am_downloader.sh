@@ -5,21 +5,27 @@ set -e
 # Configuration
 USE_FALLBACK=false          # true = use original fallback logic
 USE_CUSTOM_GO=false         # true = force custom Go path only
-USE_SYSTEM_GO=false          # true = force system Go path only
+USE_SYSTEM_GO=false         # true = force system Go path only
 USE_BINARY_EXECUTION=true   # ✅ set to true to use compiled binary
 CUSTOM_BINARY_NAME=am_downloader  # name of the compiled binary
 
-# Fallback paths
+# Paths
 CUSTOM_GO_BIN="$HOME/go-sdk/go/bin"
 SYSTEM_GO_BIN="/usr/local/go/bin"
+BINARY_PATH="$HOME/amalac/$CUSTOM_BINARY_NAME"
 
 # If we are using the binary → skip Go setup
 if [ "$USE_BINARY_EXECUTION" = true ]; then
-    cmd=(
-        /usr/local/bin/$CUSTOM_BINARY_NAME
-        "$@"
-    )
-    echo "🚀 Executing via compiled binary: $CUSTOM_BINARY_NAME"
+    if [ -x "$BINARY_PATH" ]; then
+        cmd=(
+            "$BINARY_PATH"
+            "$@"
+        )
+        echo "🚀 Executing compiled binary: $BINARY_PATH"
+    else
+        echo "❌ Compiled binary not found at $BINARY_PATH"
+        exit 1
+    fi
 else
     # Select Go path (only needed for go run)
     if [ "$USE_FALLBACK" = true ]; then
