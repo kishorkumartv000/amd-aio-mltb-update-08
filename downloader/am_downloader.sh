@@ -13,15 +13,17 @@ CUSTOM_BINARY_NAME=am_downloader  # name of the compiled binary
 CUSTOM_GO_BIN="$HOME/go-sdk/go/bin"
 SYSTEM_GO_BIN="/usr/local/go/bin"
 BINARY_PATH="$HOME/amalac/$CUSTOM_BINARY_NAME"
+PROJECT_DIR="$HOME/amalac"
 
 # If we are using the binary → skip Go setup
 if [ "$USE_BINARY_EXECUTION" = true ]; then
     if [ -x "$BINARY_PATH" ]; then
+        cd "$PROJECT_DIR"
         cmd=(
-            "$BINARY_PATH"
+            "./$CUSTOM_BINARY_NAME"
             "$@"
         )
-        echo "🚀 Executing compiled binary: $BINARY_PATH"
+        echo "🚀 Executing compiled binary from: $PROJECT_DIR/$CUSTOM_BINARY_NAME"
     else
         echo "❌ Compiled binary not found at $BINARY_PATH"
         exit 1
@@ -55,7 +57,7 @@ else
     fi
 
     # 🛠️ For go run, must cd into project dir
-    cd "$HOME/amalac"
+    cd "$PROJECT_DIR"
     cmd=(
         go run main.go
         "$@"
