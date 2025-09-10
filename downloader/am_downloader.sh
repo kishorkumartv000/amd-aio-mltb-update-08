@@ -5,8 +5,8 @@ set -e
 # Configuration
 USE_FALLBACK=false          # true = use original fallback logic
 USE_CUSTOM_GO=false         # true = force custom Go path only
-USE_SYSTEM_GO=true          # true = force system Go path only
-USE_BINARY_EXECUTION=false   # ✅ set to true to use compiled binary
+USE_SYSTEM_GO=false          # true = force system Go path only
+USE_BINARY_EXECUTION=true   # ✅ set to true to use compiled binary
 CUSTOM_BINARY_NAME=am_downloader  # name of the compiled binary
 
 # Fallback paths
