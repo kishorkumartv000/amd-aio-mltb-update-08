@@ -67,6 +67,7 @@ async def download_track(c, msg: Message):
                 }
             )
             kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Album Download (ALAC)", callback_data="appleFlag|album_alac")],
                 [InlineKeyboardButton("🎵 Single track  —song", callback_data="appleFlag|song")],
                 [InlineKeyboardButton("💿 Atmos album  —atmos", callback_data="appleFlag|atmos")],
                 [InlineKeyboardButton("🎬 Atmos track  —song —atmos", callback_data="appleFlag|song_atmos")],
@@ -207,7 +208,9 @@ async def apple_flag_select_cb(c, cb):
         link = data.get('link')
         options = dict(data.get('options') or {})
         choice = (cb.data.split('|', 1)[1] or '').strip()
-        if choice == 'song':
+        if choice == 'album_alac':
+            pass
+        elif choice == 'song':
             options['song'] = True
         elif choice == 'atmos':
             options['atmos'] = True
