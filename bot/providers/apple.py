@@ -41,7 +41,7 @@ class AppleMusicProvider:
         # Create user-specific directory
         user_dir = os.path.join(Config.LOCAL_STORAGE, str(user['user_id']), "Apple Music")
         os.makedirs(user_dir, exist_ok=True)
-        LOGGER.info(f"Created Apple Music directory: {user_dir}")
+        LOGGER.info(f"Created temporary working directory for Apple Music task: {user_dir}")
         
         # Process options
         cmd_options = self.build_options(options)
