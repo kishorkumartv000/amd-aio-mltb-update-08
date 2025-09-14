@@ -511,11 +511,15 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
 
     LOGGER.info(f"Running Apple downloader: {' '.join(cmd)}")
 
+    # Set a large buffer limit for readline to handle long lines without newlines
+    limit = 256 * 1024  # 256 KB
+
     # Run the command
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        limit=limit
     )
 
     # Register subprocess for external cancellation
