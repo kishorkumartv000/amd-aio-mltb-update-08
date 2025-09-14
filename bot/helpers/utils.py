@@ -489,7 +489,7 @@ async def cleanup(user=None, metadata=None):
 # Apple Music specific utilities
 async def run_apple_downloader(url: str, output_dir: str, options: list = None, user: dict = None, progress=None, task_id: str | None = None, cancel_event: asyncio.Event | None = None) -> dict:
     """
-    Execute Apple Music downloader script.
+    Execute Apple Music downloader script with real-time progress.
 
     Args:
         url: Apple Music URL to download
@@ -526,75 +526,69 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
     except Exception:
         pass
 
-    # Read output in chunks to avoid buffer overrun
-    stdout_chunks = []
+    # Process stdout line-by-line for real-time progress
+    stdout_lines = []
     stage_set = False
     while True:
-        # Early cancel check
+        # Check for cancellation first
         if cancel_event and cancel_event.is_set():
             try:
                 process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=5)
             except Exception:
-                pass
-            try:
-                await asyncio.wait_for(process.wait(), timeout=3)
-            except Exception:
-                try:
-                    process.kill()
-                except Exception:
-                    pass
+                process.kill()
             return {'success': False, 'error': 'Cancelled'}
-        chunk = await process.stdout.read(4096)  # Read 4KB chunks
-        if not chunk:
+
+        # Break loop if stdout is closed
+        if process.stdout.at_eof():
             break
-        stdout_chunks.append(chunk)
 
-        # Process chunk for progress updates
-        chunk_str = chunk.decode(errors='ignore')
-        if progress:
-            # Look for X/Y total pattern
-            try:
-                xy = re.search(r"(\d+)\s*/\s*(\d+)", chunk_str)
-                if xy:
-                    total = int(xy.group(2))
-                    await progress.set_total_tracks(total)
-            except Exception:
-                pass
+        try:
+            line_bytes = await process.stdout.readline()
+            if not line_bytes:
+                break
 
-            # Look for percent
-            pct_match = re.search(r'(\d+)%', chunk_str)
-            if pct_match:
+            line_str = line_bytes.decode(errors='ignore').strip()
+            stdout_lines.append(line_str)
+            LOGGER.debug(f"Apple Downloader: {line_str}")
+
+            # Update progress based on the current line
+            if progress:
                 try:
-                    pct = int(pct_match.group(1))
-                    if not stage_set:
-                        await progress.set_stage("Downloading")
-                        stage_set = True
-                    await progress.update_download(percent=pct)
+                    # Look for X/Y total pattern
+                    xy_match = re.search(r"(\d+)\s*/\s*(\d+)", line_str)
+                    if xy_match:
+                        total = int(xy_match.group(2))
+                        await progress.set_total_tracks(total)
+
+                    # Look for percent
+                    pct_match = re.search(r'(\d+)%', line_str)
+                    if pct_match:
+                        pct = int(pct_match.group(1))
+                        if not stage_set:
+                            await progress.set_stage("Downloading")
+                            stage_set = True
+                        await progress.update_download(percent=pct)
                 except Exception:
-                    pass
-        elif user and 'bot_msg' in user:
-            progress_match = re.search(r'(\d+)%', chunk_str)
-            if progress_match:
-                try:
-                    pct = int(progress_match.group(1))
-                    await edit_message(
-                        user['bot_msg'],
-                        f"Apple Music Download: {pct}%"
-                    )
-                except Exception:
-                    pass
+                    pass # Ignore parsing errors
+            elif user and 'bot_msg' in user:
+                pct_match = re.search(r'(\d+)%', line_str)
+                if pct_match:
+                    try:
+                        pct = int(pct_match.group(1))
+                        await edit_message(user['bot_msg'], f"Apple Music Download: {pct}%")
+                    except Exception:
+                        pass
+        except asyncio.CancelledError:
+            raise # Propagate cancellation
+        except Exception as e:
+            LOGGER.error(f"Error reading stdout line from downloader: {e}")
+            break # Exit loop on read error
 
-    # Combine all chunks
-    stdout_output = b''.join(stdout_chunks).decode(errors='ignore')
-    stdout_lines = stdout_output.splitlines()
-
-    # Log all output lines
-    for line in stdout_lines:
-        LOGGER.debug(f"Apple Downloader: {line}")
-
-    # Wait for process to finish
-    stderr = await process.stderr.read()
-    stderr = stderr.decode().strip()
+    # Wait for process to finish and get final exit code and stderr
+    await process.wait()
+    stderr_bytes = await process.stderr.read()
+    stderr = stderr_bytes.decode().strip()
 
     # Clear subprocess registration
     try:
@@ -604,7 +598,7 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
     except Exception:
         pass
 
-    # Move to processing stage
+    # Move to processing stage in UI
     try:
         if progress:
             await progress.set_stage("Processing")
@@ -613,9 +607,9 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
 
     # Check return code
     if process.returncode != 0:
-        error = stderr or "\n".join(stdout_lines)
-        LOGGER.error(f"Apple downloader failed: {error}")
-        return {'success': False, 'error': error}
+        error_details = stderr or "\n".join(stdout_lines)
+        LOGGER.error(f"Apple downloader failed with code {process.returncode}: {error_details}")
+        return {'success': False, 'error': error_details}
 
     return {'success': True}
 
