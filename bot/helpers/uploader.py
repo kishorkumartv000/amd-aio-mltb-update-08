@@ -433,7 +433,7 @@ async def rclone_upload(user, path, base_path):
             if base:
                 base_abs = os.path.abspath(base)
                 if p_abs.startswith(base_abs):
-                    return os.path.relpath(p_abs, base_abs)
+                    return os.path.normpath(os.path.relpath(p_abs, base_abs))
         except Exception:
             pass
         # Fallback: try to anchor at "Apple Music" if present
@@ -443,7 +443,7 @@ async def rclone_upload(user, path, base_path):
                 if "Apple Music" in parts:
                     idx = parts.index("Apple Music")
                     root = os.sep.join(parts[:idx + 1])
-                    return os.path.relpath(p_abs, root)
+                    return os.path.normpath(os.path.relpath(p_abs, root))
             except Exception:
                 pass
         # Last resort: basename
