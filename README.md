@@ -98,6 +98,7 @@ sudo docker run -d --env-file .env --name siesta project-siesta
 - `API_HASH` - Your Telegram APP HASH (get it from my.telegram.org) `(str)`
 - `DATABASE_TYPE` - (Optional) The type of database to use. Can be `postgres` or `mongodb`. Defaults to `postgres`. `(str)`
 - `DATABASE_URL` - The connection URL for your chosen database. Make sure this matches the `DATABASE_TYPE` (e.g., `postgresql://...` for postgres, `mongodb://...` for mongodb). `(str)`
+- `MONGODB_DATABASE` - (Optional) If using MongoDB, you can specify the database name here. This is required if the database name is not in the `DATABASE_URL`. `(str)`
 - `BOT_USERNAME` - Your Telegram Bot username (with or without `@`) `(str)`
 - `ADMINS` - List of Admin users for the Bot (seperated by space) `(str)`
 

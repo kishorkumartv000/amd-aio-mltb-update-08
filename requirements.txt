@@ -18,4 +18,3 @@ dataclasses_json
 m3u8
 pycryptodome
 tidal-dl-ng
-pymongo
