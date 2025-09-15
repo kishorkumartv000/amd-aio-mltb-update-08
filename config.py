@@ -24,6 +24,7 @@ class Config:
     # Database Configuration
     DATABASE_URL      = getenv("DATABASE_URL")                            # PostgreSQL or MongoDB URL
     DATABASE_TYPE     = getenv("DATABASE_TYPE", "postgres").lower()       # 'postgres' or 'mongodb'
+    MONGODB_DATABASE  = getenv("MONGODB_DATABASE", None)                    # Optional: a specific database name for MongoDB
 
     # Working Directory
     UPLOAD_MODE       = getenv("UPLOAD_MODE", "Telegram")                  # Telegram, RCLONE, or Local

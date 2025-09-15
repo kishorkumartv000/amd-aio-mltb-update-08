@@ -119,11 +119,27 @@ class MongoDatabase(DatabaseInterface):
 
     def connect(self, db_url: str, **kwargs) -> None:
         """Connect to the database and initialize repositories."""
+        from config import Config
+        from pymongo.errors import ConfigurationError
+
         if self._client:
             return
 
         self._client = MongoClient(db_url)
-        self._db_name = self._client.get_database().name
+
+        # Determine the database name
+        db_name = Config.MONGODB_DATABASE
+        if not db_name:
+            try:
+                db_name = self._client.get_database().name
+            except ConfigurationError:
+                raise ConfigurationError(
+                    "No default database is defined in your MongoDB URL. "
+                    "Please specify one in the URL (e.g., 'mongodb://.../your_db') "
+                    "or set the MONGODB_DATABASE environment variable."
+                )
+
+        self._db_name = db_name
 
         self.settings = MongoSettingsRepo(self._client, self._db_name)
         self.history = MongoHistoryRepo(self._client, self._db_name)
