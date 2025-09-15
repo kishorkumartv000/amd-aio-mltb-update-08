@@ -525,19 +525,24 @@ async def rclone_upload(user, path, base_path):
         index_link = f"{Config.INDEX_LINK}/{relative_path}".replace(" ", "%20")
 
     # Remote info for post-upload manage flow
-    # Parse remote name and base path from dest_root (format remote:base)
+    # Parse remote name and base path from dest_root (format remote:path)
     remote_name = ''
     remote_base = ''
-    try:
-        if dest_root and ':' in dest_root:
+    if dest_root:
+        if ':' in dest_root:
             remote_name, remote_base = dest_root.split(':', 1)
-            remote_base = remote_base.strip('/')
         else:
-            remote_name = (getattr(bot_set, 'rclone_remote', '') or dest_root or '').rstrip(':')
-            remote_base = ''
-    except Exception:
-        remote_name = (getattr(bot_set, 'rclone_remote', '') or (Config.RCLONE_DEST.split(':',1)[0] if Config.RCLONE_DEST and ':' in Config.RCLONE_DEST else '')).rstrip(':')
-        remote_base = ''
+            # If no colon, the whole string is the remote name
+            remote_name = dest_root
+
+    # Clean up and ensure remote_name is not None
+    remote_name = (remote_name or '').strip()
+    remote_base = (remote_base or '').strip('/')
+
+    # A specific remote from settings should always take precedence
+    # This is useful if dest_root is just a path, but user has a remote selected
+    if getattr(bot_set, 'rclone_remote', None):
+        remote_name = bot_set.rclone_remote
 
     remote_info = {
         'remote': remote_name,
