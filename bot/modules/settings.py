@@ -723,12 +723,6 @@ async def _rclone_cc_render_browse(client, cb_or_msg, which: str, include_files:
     data = state.get('data', {})
     base_path = data.get(f'{which}_path', '')
     remote = data.get(f'{which}_remote')
-    if not remote:
-        return await edit_message(
-            cb_or_msg.message if isinstance(cb_or_msg, CallbackQuery) else cb_or_msg,
-            "❌ **Session Expired**\n\nThis interactive session has expired, likely due to a bot restart. Please start the operation again.",
-            rclone_buttons()
-        )
     try:
         dirs, files = await _rclone_cc_list(remote, base_path, include_files)
     except Exception as e:
@@ -1232,28 +1226,46 @@ async def rclone_cloud_move_start_cb(client, cb:CallbackQuery):
 @Client.on_callback_query(filters.regex(pattern=r"^rcloneManageStart\|"))
 async def rclone_manage_start_cb(client, cb:CallbackQuery):
     if await check_user(cb.from_user.id, restricted=True):
+        from ..helpers.database.pg_impl import rclone_sessions_db
         from ..helpers.state import conversation_state
-        # Extract token-specific context
+
         try:
             token = cb.data.split('|', 1)[1]
         except Exception:
             token = None
-        state = await conversation_state.get(cb.from_user.id) or {}
-        data = state.get('data', {})
-        manage_map = data.get('rclone_manage_map') or {}
-        ctx = manage_map.get(token) or {}
-        # Expect keys from uploader: src_remote, base, src_path, src_file
+
+        if not token:
+            return await cb.answer("Invalid button.", show_alert=True)
+
+        # Get the session context from the database
+        ctx = rclone_sessions_db.get_session(token)
+
+        if not ctx:
+            return await edit_message(
+                cb.message,
+                "❌ **Session Expired or Invalid**\n\nThis interactive session has expired or is invalid. Please start the operation again.",
+                rclone_buttons()
+            )
+
+        # Clean up the one-time session token from the database
+        rclone_sessions_db.delete_session(token)
+
+        # Proceed with the original logic, using the context from the DB
         src_remote = ctx.get('src_remote')
         base = (ctx.get('base') or '').strip('/')
         src_path = (ctx.get('src_path') or '').strip('/')
-        # Merge base into src_path for CC flow
+
         effective = f"{base}/{src_path}".strip('/') if base else src_path
+
+        # We still use conversation_state for the multi-step browsing process,
+        # but the initial state is now loaded from the persistent database.
         await conversation_state.update(
             cb.from_user.id,
             stage='rclone_cc_browse_src',
             src_remote=src_remote,
             src_path=effective,
-            # keep src_file as-is if present (it should already be relative)
+            src_file=ctx.get('src_file'), # Pass this along too
+            cc_mode=ctx.get('cc_mode', 'copy'),
             cc_src_multi=False,
             cc_src_selected=[],
             src_page=0

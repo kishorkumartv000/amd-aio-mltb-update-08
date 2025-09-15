@@ -204,3 +204,51 @@ class UserSettings(DataBaseHandle):
         return None
 
 user_set_db = UserSettings()
+
+
+class RcloneSessionsDB(DataBaseHandle):
+    def __init__(self, dburl=None):
+        if dburl is None:
+            dburl = Config.DATABASE_URL
+        super().__init__(dburl)
+
+        schema = """
+        CREATE TABLE IF NOT EXISTS rclone_sessions (
+            token VARCHAR(20) PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            context JSONB NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_rclone_sessions_created_at ON rclone_sessions(created_at);
+        """
+        cur = self.scur()
+        cur.execute(schema)
+        self._conn.commit()
+        self.ccur(cur)
+
+    def add_session(self, token: str, user_id: int, context: dict):
+        sql = "INSERT INTO rclone_sessions (token, user_id, context) VALUES (%s, %s, %s)"
+        cur = self.scur()
+        cur.execute(sql, (token, user_id, psycopg2.extras.Json(context)))
+        self._conn.commit()
+        self.ccur(cur)
+
+    def get_session(self, token: str):
+        sql = "SELECT context FROM rclone_sessions WHERE token = %s"
+        cur = self.scur(dictcur=True)
+        cur.execute(sql, (token,))
+        if cur.rowcount > 0:
+            val = cur.fetchone()
+            self.ccur(cur)
+            return val['context']
+        self.ccur(cur)
+        return None
+
+    def delete_session(self, token: str):
+        sql = "DELETE FROM rclone_sessions WHERE token = %s"
+        cur = self.scur()
+        cur.execute(sql, (token,))
+        self._conn.commit()
+        self.ccur(cur)
+
+rclone_sessions_db = RcloneSessionsDB()
