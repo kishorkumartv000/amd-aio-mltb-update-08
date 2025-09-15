@@ -13,6 +13,8 @@ Note: This is not a music streaming / VC Bot
 
 **Currently the project is in early development stage and features are incomplete**
 
+- **Flexible Database Support:** Choose between PostgreSQL and MongoDB for your database backend.
+
 Feels free to check the repo and report bugs / features
 
 **A complete guide for ~~downloading~~ (coughs..) ehmm.... can be found [here](https://rentry.org/project-siesta)**
@@ -94,7 +96,8 @@ sudo docker run -d --env-file .env --name siesta project-siesta
 - `TG_BOT_TOKEN` - Telegeam bot token (get it from [BotFather](https://t.me/BotFather))
 - `APP_ID` - Your Telegram APP ID (get it from my.telegram.org) `(int)`
 - `API_HASH` - Your Telegram APP HASH (get it from my.telegram.org) `(str)`
-- `DATABASE_URL` - Postgres database URL (self hosted or any service) `(str)`
+- `DATABASE_TYPE` - (Optional) The type of database to use. Can be `postgres` or `mongodb`. Defaults to `postgres`. `(str)`
+- `DATABASE_URL` - The connection URL for your chosen database. Make sure this matches the `DATABASE_TYPE` (e.g., `postgresql://...` for postgres, `mongodb://...` for mongodb). `(str)`
 - `BOT_USERNAME` - Your Telegram Bot username (with or without `@`) `(str)`
 - `ADMINS` - List of Admin users for the Bot (seperated by space) `(str)`
 
