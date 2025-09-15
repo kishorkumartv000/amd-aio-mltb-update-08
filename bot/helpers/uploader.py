@@ -11,7 +11,6 @@ import re
 from bot.settings import bot_set
 from bot.helpers.progress import ProgressReporter
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from ..helpers.state import conversation_state
 
 async def track_upload(metadata, user, index: int = None, total: int = None):
     """
@@ -550,24 +549,25 @@ async def rclone_upload(user, path, base_path):
 
 async def _post_rclone_manage_button(user, remote_info: dict):
     try:
-        # Seed conversation state for manage flow. Use a unique token so older buttons continue to work.
+        from ..helpers.database.pg_impl import rclone_sessions_db
         import uuid
+
+        # Generate a unique token for the session
         token = uuid.uuid4().hex[:10]
+
+        # Prepare the context to be stored in the database
         src_remote = remote_info.get('remote')
         rel_path = remote_info.get('path') or ''
         is_dir = bool(remote_info.get('is_dir'))
-        # If file, keep full path in src_file and base folder in src_path
+
         if is_dir:
             src_path = rel_path
             src_file = None
         else:
             src_path = os.path.dirname(rel_path)
             src_file = rel_path
-        # Store multiple manage contexts keyed by token
-        state = await conversation_state.get(user['user_id']) or {"stage": None, "data": {}}
-        ctx = state.get('data', {})
-        manage_map = dict(ctx.get('rclone_manage_map') or {})
-        manage_map[token] = {
+
+        context = {
             'src_remote': src_remote,
             'base': remote_info.get('base') if isinstance(remote_info, dict) else None,
             'src_path': src_path,
@@ -577,14 +577,22 @@ async def _post_rclone_manage_button(user, remote_info: dict):
             'cc_mode': 'copy',
             'src_page': 0
         }
-        await conversation_state.update(user['user_id'], rclone_manage_map=manage_map)
-        # Button to open manage UI
+
+        # Save the session to the database
+        rclone_sessions_db.add_session(
+            token=token,
+            user_id=user['user_id'],
+            context=context
+        )
+
+        # Button to open manage UI, with the token in the callback
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("📂 Browse uploaded (Copy/Move)", callback_data=f"rcloneManageStart|{token}")]
         ])
         await send_message(user, "Manage the uploaded item:", markup=kb)
     except Exception as e:
         try:
-            await send_message(user, f"Note: manage button unavailable ({e})")
+            LOGGER.error(f"Failed to create rclone manage button: {e}", exc_info=True)
+            await send_message(user, "Note: manage button unavailable.")
         except Exception:
             pass
