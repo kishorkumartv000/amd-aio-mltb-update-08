@@ -556,31 +556,33 @@ async def run_apple_downloader(url: str, output_dir: str, options: list = None, 
             stdout_lines.append(line_str)
             LOGGER.debug(f"Apple Downloader: {line_str}")
 
-            # Update progress based on the current line
+            # Update progress based on the current line (simplified to per-track)
             if progress:
                 try:
-                    # Look for X/Y total pattern
+                    # Look for X/Y total pattern (e.g., "1/10" or "Downloading 1/10")
                     xy_match = re.search(r"(\d+)\s*/\s*(\d+)", line_str)
                     if xy_match:
+                        done = int(xy_match.group(1))
                         total = int(xy_match.group(2))
-                        await progress.set_total_tracks(total)
 
-                    # Look for percent
-                    pct_match = re.search(r'(\d+)%', line_str)
-                    if pct_match:
-                        pct = int(pct_match.group(1))
                         if not stage_set:
                             await progress.set_stage("Downloading")
+                            await progress.set_total_tracks(total)
                             stage_set = True
-                        await progress.update_download(percent=pct)
+
+                        # Update progress based on number of tracks done
+                        await progress.update_download(tracks_done=done)
+
                 except Exception:
                     pass # Ignore parsing errors
             elif user and 'bot_msg' in user:
-                pct_match = re.search(r'(\d+)%', line_str)
-                if pct_match:
+                # Fallback for simple message update if progress reporter is not used
+                xy_match = re.search(r"(\d+)\s*/\s*(\d+)", line_str)
+                if xy_match:
                     try:
-                        pct = int(pct_match.group(1))
-                        await edit_message(user['bot_msg'], f"Apple Music Download: {pct}%")
+                        done = int(xy_match.group(1))
+                        total = int(xy_match.group(2))
+                        await edit_message(user['bot_msg'], f"Apple Music Download: {done}/{total}")
                     except Exception:
                         pass
         except asyncio.CancelledError:
