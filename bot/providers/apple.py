@@ -49,7 +49,7 @@ class AppleMusicProvider:
         # Initialize progress reporter
         from bot.helpers.progress import ProgressReporter
         label = f"Apple Music • ID: {user.get('task_id','?')}"
-        reporter = ProgressReporter(user['bot_msg'], label=label)
+        reporter = ProgressReporter(user['bot_msg'], label=label, show_system_stats=False)
         user['progress'] = reporter
         await reporter.set_stage("Preparing")
         
