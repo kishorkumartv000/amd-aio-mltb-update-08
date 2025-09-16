@@ -43,10 +43,11 @@ async def log_progress(stream, reporter: ProgressReporter):
                 continue  # Skip to next line once we have a track update
 
             # Look for percentage as a fallback
-            pct_match = re.search(r'(\d+)%', output)
-            if pct_match:
-                pct = int(pct_match.group(1))
-                await reporter.update_download(percent=pct)
+            # Hiding percentage parsing to reduce API calls
+            # pct_match = re.search(r'(\d+)%', output)
+            # if pct_match:
+            #     pct = int(pct_match.group(1))
+            #     await reporter.update_download(percent=pct)
 
         except Exception as e:
             LOGGER.debug(f"Could not parse progress from Tidal NG line: {output} - {e}")
