@@ -78,13 +78,13 @@ class ProgressReporter:
             if not force and (now - self._last_update) < self._min_interval:
                 return
             self._last_update = now
-            text = self._render()
+            text = await self._render()
             try:
                 await edit_message(self.msg, text)
             except Exception as e:
                 LOGGER.debug(f"Progress update skipped: {e}")
 
-    def _render(self) -> str:
+    async def _render(self) -> str:
         lines = []
         stage_emoji = {
             "Preparing": "🟡",
@@ -97,22 +97,11 @@ class ProgressReporter:
         }
         lines.append(f"{stage_emoji.get(self.stage, '🔄')} {self.label} • {self.stage}")
 
-        # Optional system stats line
+        # Optional system stats line (run in a thread to avoid blocking)
         if self._show_system_stats:
-            try:
-                import psutil, shutil, os
-                cpu = psutil.cpu_percent(interval=None)
-                mem = psutil.virtual_memory()
-                mem_used = int(mem.used / (1024**3))
-                mem_total = int(mem.total / (1024**3))
-                # Choose storage path; fallback to current cwd
-                base = os.getenv("LOCAL_STORAGE") or os.getcwd()
-                du = shutil.disk_usage(base)
-                disk_used = int(du.used / (1024**3))
-                disk_total = int(du.total / (1024**3))
-                lines.append(f"🖥️ CPU {cpu}% • RAM {mem_used}/{mem_total} GB • Disk {disk_used}/{disk_total} GB")
-            except Exception:
-                pass
+            stats_line = await asyncio.to_thread(self._get_system_stats_sync)
+            if stats_line:
+                lines.append(stats_line)
 
         # Download section
         if self.stage in ("Downloading", "Processing") or self.download_percent > 0 or self.tracks_done > 0:
@@ -137,3 +126,22 @@ class ProgressReporter:
             lines.append(f"📤 {bar} {percent}%{idx}")
 
         return "\n".join(lines)
+
+    def _get_system_stats_sync(self) -> str | None:
+        """Synchronous method to get system stats. Meant to be run in a thread."""
+        try:
+            import psutil, shutil, os
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory()
+            # Choose storage path; fallback to current cwd
+            base = os.getenv("LOCAL_STORAGE") or os.getcwd()
+            du = shutil.disk_usage(base)
+
+            mem_used = int(mem.used / (1024**3))
+            mem_total = int(mem.total / (1024**3))
+            disk_used = int(du.used / (1024**3))
+            disk_total = int(du.total / (1024**3))
+
+            return f"🖥️ CPU {cpu}% • RAM {mem_used}/{mem_total} GB • Disk {disk_used}/{disk_total} GB"
+        except Exception:
+            return None
