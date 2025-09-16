@@ -85,38 +85,35 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
         user = await fetch_user_details(user)
     chat_id = chat_id if chat_id else user['chat_id']
     
-    # Initialize msg to prevent UnboundLocalError
-    msg = None
+    # Get the running event loop safely in the main async context
+    try:
+        main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Fallback for scenarios where there might not be a running loop
+        # (though unlikely in this bot's architecture)
+        main_loop = asyncio.get_event_loop()
 
     # Progress callback wrapper for uploads
-    def _make_progress_cb(label=None, index=None, total=None):
-        # --- Throttling logic for progress reporting ---
-        # This dictionary holds the state for the throttle,
-        # allowing it to persist across calls to the inner _cb function.
+    def _make_progress_cb(loop, label=None, index=None, total=None):
+        # This dictionary holds the state for the throttle.
         throttle_state = {
             'last_update_time': 0,
-            'min_interval': 2.0  # Update every 2 seconds
+            'min_interval': 2.0
         }
 
         def _cb(current, total_bytes):
-            # Immediately stop if the task was cancelled
             if cancel_event and cancel_event.is_set():
                 raise RuntimeError("Upload cancelled by user.")
 
-            # Check if enough time has passed to send the next update
             now = time.monotonic()
             if now - throttle_state['last_update_time'] < throttle_state['min_interval']:
-                # If not enough time has passed, do nothing. This prevents
-                # flooding the event loop with unnecessary tasks.
                 return
 
-            # If enough time has passed, update the timestamp and schedule the update.
             throttle_state['last_update_time'] = now
 
             if progress_reporter:
                 try:
-                    loop = asyncio.get_event_loop()
-                    # Schedule the real async update function to run
+                    # Use the loop object that was passed in from the main thread
                     loop.create_task(progress_reporter.update_upload(
                         current,
                         total_bytes,
@@ -125,23 +122,23 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
                         label=label or 'Uploading'
                     ))
                 except Exception as e:
-                    # Log if task creation fails, though it's unlikely.
-                    LOGGER.warning(f"Failed to schedule progress update: {e}")
+                    # Log if task creation fails
+                    LOGGER.error(f"Failed to schedule progress update: {e}")
 
         return _cb
 
-    # Pre-stage update so users see "Uploading" immediately, and initialize totals
+    # Pre-stage update so users see "Uploading" immediately
     if progress_reporter and itype in ('doc', 'audio', 'video'):
         try:
             await progress_reporter.set_stage(progress_label or 'Uploading')
             if isinstance(item, str) and os.path.exists(item):
-                try:
-                    total_bytes = os.path.getsize(item)
-                    await progress_reporter.update_upload(0, total_bytes, file_index=file_index, file_total=total_files, label=progress_label or 'Uploading')
-                except Exception:
-                    pass
+                total_bytes = os.path.getsize(item)
+                await progress_reporter.update_upload(0, total_bytes, file_index=file_index, file_total=total_files, label=progress_label or 'Uploading')
         except Exception:
             pass
+
+    # Create the progress callback instance using the main loop
+    progress_callback = _make_progress_cb(main_loop, progress_label, file_index, total_files) if progress_reporter else None
 
     try:
         if itype == 'text':
@@ -159,10 +156,9 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
                 document=item,
                 caption=caption,
                 reply_to_message_id=user['r_id'],
-                progress=_make_progress_cb(progress_label, file_index, total_files) if progress_reporter else None
+                progress=progress_callback
             )
         elif itype == 'audio':
-            # SAFE METADATA ACCESS WITH DEFAULTS
             duration = int(meta.get('duration', 0)) if meta else 0
             artist = meta.get('artist', 'Unknown Artist') if meta else 'Unknown Artist'
             title = meta.get('title', 'Unknown Track') if meta else 'Unknown Track'
@@ -177,10 +173,9 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
                 title=title,
                 thumb=thumbnail,
                 reply_to_message_id=user['r_id'],
-                progress=_make_progress_cb(progress_label, file_index, total_files) if progress_reporter else None
+                progress=progress_callback
             )
-        elif itype == 'video':  # Added video type support
-            # SAFE METADATA ACCESS WITH DEFAULTS
+        elif itype == 'video':
             duration = int(meta.get('duration', 0)) if meta else 0
             width = int(meta.get('width', 1920)) if meta else 1920
             height = int(meta.get('height', 1080)) if meta else 1080
@@ -195,7 +190,7 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
                 height=height,
                 thumb=thumbnail,
                 reply_to_message_id=user['r_id'],
-                progress=_make_progress_cb(progress_label, file_index, total_files) if progress_reporter else None
+                progress=progress_callback
             )
         elif itype == 'pic':
             msg = await aio.send_photo(
