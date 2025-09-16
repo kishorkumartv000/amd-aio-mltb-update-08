@@ -1,6 +1,7 @@
 import os
 import asyncio
 import re
+import time
 
 from pyrogram.types import Message
 from pyrogram.errors import MessageNotModified, FloodWait
@@ -89,15 +90,44 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
 
     # Progress callback wrapper for uploads
     def _make_progress_cb(label=None, index=None, total=None):
+        # --- Throttling logic for progress reporting ---
+        # This dictionary holds the state for the throttle,
+        # allowing it to persist across calls to the inner _cb function.
+        throttle_state = {
+            'last_update_time': 0,
+            'min_interval': 2.0  # Update every 2 seconds
+        }
+
         def _cb(current, total_bytes):
+            # Immediately stop if the task was cancelled
             if cancel_event and cancel_event.is_set():
-                raise RuntimeError("Cancelled")
+                raise RuntimeError("Upload cancelled by user.")
+
+            # Check if enough time has passed to send the next update
+            now = time.monotonic()
+            if now - throttle_state['last_update_time'] < throttle_state['min_interval']:
+                # If not enough time has passed, do nothing. This prevents
+                # flooding the event loop with unnecessary tasks.
+                return
+
+            # If enough time has passed, update the timestamp and schedule the update.
+            throttle_state['last_update_time'] = now
+
             if progress_reporter:
                 try:
                     loop = asyncio.get_event_loop()
-                    loop.create_task(progress_reporter.update_upload(current, total_bytes, file_index=index, file_total=total, label=label or 'Uploading'))
-                except Exception:
-                    pass
+                    # Schedule the real async update function to run
+                    loop.create_task(progress_reporter.update_upload(
+                        current,
+                        total_bytes,
+                        file_index=index,
+                        file_total=total,
+                        label=label or 'Uploading'
+                    ))
+                except Exception as e:
+                    # Log if task creation fails, though it's unlikely.
+                    LOGGER.warning(f"Failed to schedule progress update: {e}")
+
         return _cb
 
     # Pre-stage update so users see "Uploading" immediately, and initialize totals
