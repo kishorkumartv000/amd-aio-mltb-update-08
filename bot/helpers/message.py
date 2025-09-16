@@ -131,8 +131,9 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
     if progress_reporter and itype in ('doc', 'audio', 'video'):
         try:
             await progress_reporter.set_stage(progress_label or 'Uploading')
-            if isinstance(item, str) and os.path.exists(item):
-                total_bytes = os.path.getsize(item)
+            # Run blocking file operations in a thread
+            if isinstance(item, str) and await asyncio.to_thread(os.path.exists, item):
+                total_bytes = await asyncio.to_thread(os.path.getsize, item)
                 await progress_reporter.update_upload(0, total_bytes, file_index=file_index, file_total=total_files, label=progress_label or 'Uploading')
         except Exception:
             pass
