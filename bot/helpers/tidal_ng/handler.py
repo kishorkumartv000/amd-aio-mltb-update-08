@@ -13,6 +13,7 @@ from bot.helpers.utils import (
     extract_audio_metadata,
     extract_video_metadata,
 )
+from ..progress import ProgressReporter
 from bot.helpers.tidal_ng.uploader import track_upload, album_upload, playlist_upload, music_video_upload
 from bot.helpers.tidal_ng.utils import get_tidal_ng_download_base_path
 
@@ -22,19 +23,33 @@ TIDAL_DL_NG_CLI_PATH = "/usr/src/app/tidal-dl-ng/tidal_dl_ng/cli.py"
 TIDAL_DL_NG_SETTINGS_PATH = "/root/.config/tidal_dl_ng/settings.json"
 
 
-async def log_progress(stream, bot_msg, user):
-    """Reads a stream (stdout/stderr) from the subprocess and updates the Telegram message."""
+async def log_progress(stream, reporter: ProgressReporter):
+    """Reads a stream from the subprocess and will eventually update the ProgressReporter."""
+    # The parsing logic will be added in the next step. For now, we just log.
     while True:
         line = await stream.readline()
         if not line:
             break
         output = line.decode("utf-8").strip()
         LOGGER.info(f"[TidalDL-NG] {output}")
-        if output:
-            try:
-                await edit_message(bot_msg, f"```\n{output}\n```")
-            except Exception:
-                pass
+        try:
+            # Look for track counter first (e.g., "[1/10]")
+            track_match = re.search(r"\[(\d+)/(\d+)\]", output)
+            if track_match:
+                done = int(track_match.group(1))
+                total = int(track_match.group(2))
+                await reporter.set_total_tracks(total)
+                await reporter.update_download(tracks_done=done)
+                continue  # Skip to next line once we have a track update
+
+            # Look for percentage as a fallback
+            pct_match = re.search(r'(\d+)%', output)
+            if pct_match:
+                pct = int(pct_match.group(1))
+                await reporter.update_download(percent=pct)
+
+        except Exception as e:
+            LOGGER.debug(f"Could not parse progress from Tidal NG line: {output} - {e}")
 
 
 def get_content_id_from_url(url: str) -> str:
@@ -51,6 +66,11 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
     original_settings = None
     user_id = user.get("user_id")
 
+    # Initialize progress reporter
+    label = "Tidal NG"
+    reporter = ProgressReporter(bot_msg, label=label, show_system_stats=False)
+    await reporter.set_stage("Downloading")
+
     try:
         # --- Load original settings.json ---
         try:
@@ -64,7 +84,6 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         final_download_path.mkdir(parents=True, exist_ok=True)
 
         # --- Execute Download ---
-        await edit_message(bot_msg, "🚀 Starting Tidal NG download...")
         # Ensure ffmpeg path is set for the tool via environment/config
         env = os.environ.copy()
         env["FFMPEG_PATH"] = "/usr/bin/ffmpeg"
@@ -76,8 +95,8 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             env=env,
         )
         await asyncio.gather(
-            log_progress(process.stdout, bot_msg, user),
-            log_progress(process.stderr, bot_msg, user),
+            log_progress(process.stdout, reporter),
+            log_progress(process.stderr, reporter),
         )
         await process.wait()
 
@@ -89,7 +108,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         LOGGER.info(f"Tidal-NG: Using download path {final_download_path}")
 
         # --- Collect Files ---
-        await edit_message(bot_msg, "📥 Download complete. Processing files...")
+        await reporter.set_stage("Processing")
         downloaded_files = []
         for root, _, files in os.walk(final_download_path):
             for file in files:
