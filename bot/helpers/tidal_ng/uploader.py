@@ -36,7 +36,9 @@ async def create_tidal_ng_zip(directory: str, user_id: int, metadata: dict) -> s
     """
     title = (metadata.get('title') or 'Tidal NG').strip()
     # sanitize and convert spaces to underscores similar to Apple helper
-    safe_title = re.sub(r'[\\/*?:"<>|]', '', title).replace(' ', '_')
+    safe_title = re.sub(r'[\\/*?:"<>|]', '', title)
+    if bot_set.zip_name_use_underscores:
+        safe_title = safe_title.replace(' ', '_')
     provider = 'Tidal NG'
     ctype = (metadata.get('type') or 'album').strip().lower()
 

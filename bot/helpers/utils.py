@@ -768,7 +768,9 @@ async def create_apple_zip(directory: str, user_id: int, metadata: dict, progres
     
     # Sanitize the content name for filesystem safety
     safe_name = re.sub(r'[\\/*?:"<>|]', "", content_name)
-    safe_name = safe_name.replace(' ', '_')[:100]  # Limit length
+    if bot_set.zip_name_use_underscores:
+        safe_name = safe_name.replace(' ', '_')
+    safe_name = safe_name[:100]  # Limit length
     
     # If name is empty after sanitization, use fallback
     if not safe_name.strip():

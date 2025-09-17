@@ -182,6 +182,12 @@ def core_buttons():
                 text=f"Extract Embedded Cover: {'True' if bot_set.extract_embedded_cover else 'False'}",
                 callback_data='toggleExtractCover'
             )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"Safe Zip Names: {'ON' if bot_set.zip_name_use_underscores else 'OFF'}",
+                callback_data='toggleSafeZipNames'
+            )
         ]
     ]
     inline_keyboard += main_button + close_button

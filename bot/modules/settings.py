@@ -548,6 +548,20 @@ async def artist_zip_cb(client, cb:CallbackQuery):
             pass
 
 
+@Client.on_callback_query(filters.regex(pattern=r"^toggleSafeZipNames$"))
+async def toggle_safe_zip_names_cb(client, cb:CallbackQuery):
+    if await check_user(cb.from_user.id, restricted=True):
+        try:
+            bot_set.zip_name_use_underscores = not bool(getattr(bot_set, 'zip_name_use_underscores', True))
+            set_db.set_variable('ZIP_NAME_USE_UNDERSCORES', bot_set.zip_name_use_underscores)
+        except Exception:
+            pass
+        try:
+            await core_cb(client, cb)
+        except:
+            pass
+
+
 @Client.on_callback_query(filters.regex(pattern=r"^albZip"))
 async def album_zip_cb(client, cb:CallbackQuery):
     if await check_user(cb.from_user.id, restricted=True):

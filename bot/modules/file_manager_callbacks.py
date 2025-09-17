@@ -12,31 +12,24 @@ async def fm_browse_cb(c: Client, cb: CallbackQuery):
         return
 
     try:
-        # Format: fm_browse:/path/to/dir:page
-        parts = cb.data.split(":", 2)
+        # Format: fm_browse:path:page:back_callback
+        parts = cb.data.split(":", 3)
         path = parts[1]
-        page = int(parts[2]) if len(parts) > 2 else 0
+        # Handle optional page and back_callback
+        page = 0
+        back_callback = None
+        if len(parts) > 2 and parts[2].isdigit():
+            page = int(parts[2])
+        if len(parts) > 3:
+            back_callback = parts[3]
+        elif len(parts) > 2 and not parts[2].isdigit():
+             back_callback = parts[2]
+
     except (IndexError, ValueError):
         await cb.answer("Error: Invalid callback data.", show_alert=True)
         return
 
-    text, buttons = await build_file_browser(path, page)
-
-    # Add a close button to the main browser view
-    back_button_row = -1
-    # Find a row with a "Back" button to append to, or just add a new row
-    for i, row in enumerate(buttons):
-        for button in row:
-            if button.callback_data and "providerPanel" in button.callback_data:
-                back_button_row = i
-                break
-
-    # The generic browser doesn't know the context of which provider panel to return to.
-    # For now, we'll just add a generic close button. This will be improved when integrated.
-    if back_button_row == -1:
-         buttons.append([InlineKeyboardButton("❌ Close", callback_data="close")])
-
-
+    text, buttons = await build_file_browser(path, page, back_callback)
     await edit_message(cb.message, text, InlineKeyboardMarkup(buttons))
 
 
@@ -47,31 +40,36 @@ async def fm_select_cb(c: Client, cb: CallbackQuery):
         return
 
     try:
-        filepath = cb.data.split(":", 1)[1]
-        # To get the parent dir for the back button, we need to handle the case where the path is a file
-        parent_dir = os.path.dirname(filepath) if os.path.isdir(filepath) else os.path.dirname(os.path.abspath(filepath))
-
+        # Format: fm_select:filepath:back_callback
+        parts = cb.data.split(":", 2)
+        filepath = parts[1]
+        back_callback = parts[2] if len(parts) > 2 else None
+        parent_dir = os.path.dirname(os.path.abspath(filepath))
     except IndexError:
         await cb.answer("Error: Invalid file path in callback.", show_alert=True)
         return
 
     if not os.path.exists(filepath) or not os.path.isfile(filepath):
         await cb.answer("Error: File no longer exists.", show_alert=True)
-        # Try to refresh the parent directory view
-        text, buttons = await build_file_browser(parent_dir, 0)
+        text, buttons = await build_file_browser(parent_dir, 0, back_callback)
         await edit_message(cb.message, text, InlineKeyboardMarkup(buttons))
         return
 
     filename = os.path.basename(filepath)
     text = f"**Selected File:**\n`{filename}`\n\nChoose an action:"
 
+    # Propagate the back_callback
+    back_browse_cb = f"fm_browse:{parent_dir}:{back_callback}" if back_callback else f"fm_browse:{parent_dir}"
+    download_cb = f"fm_download:{filepath}:{back_callback}" if back_callback else f"fm_download:{filepath}"
+    delete_cb = f"fm_delete_confirm:{filepath}:{back_callback}" if back_callback else f"fm_delete_confirm:{filepath}"
+
     buttons = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("⬇️ Download", callback_data=f"fm_download:{filepath}"),
-            InlineKeyboardButton("❌ Delete", callback_data=f"fm_delete_confirm:{filepath}")
+            InlineKeyboardButton("⬇️ Download", callback_data=download_cb),
+            InlineKeyboardButton("❌ Delete", callback_data=delete_cb)
         ],
         [
-            InlineKeyboardButton("🔙 Back to Browser", callback_data=f"fm_browse:{parent_dir}")
+            InlineKeyboardButton("🔙 Back to Browser", callback_data=back_browse_cb)
         ]
     ])
     await edit_message(cb.message, text, buttons)
@@ -84,7 +82,8 @@ async def fm_download_cb(c: Client, cb: CallbackQuery):
 
     await cb.answer("Preparing to send file...", show_alert=False)
     try:
-        filepath = cb.data.split(":", 1)[1]
+        # Format: fm_download:filepath:back_callback
+        filepath = cb.data.split(":", 2)[1]
         if os.path.isfile(filepath):
             await c.send_document(
                 chat_id=cb.message.chat.id,
@@ -104,7 +103,10 @@ async def fm_delete_confirm_cb(c: Client, cb: CallbackQuery):
         return
 
     try:
-        filepath = cb.data.split(":", 1)[1]
+        # Format: fm_delete_confirm:filepath:back_callback
+        parts = cb.data.split(":", 2)
+        filepath = parts[1]
+        back_callback = parts[2] if len(parts) > 2 else None
         parent_dir = os.path.dirname(os.path.abspath(filepath))
     except IndexError:
         await cb.answer("Error: Invalid file path in callback.", show_alert=True)
@@ -113,13 +115,18 @@ async def fm_delete_confirm_cb(c: Client, cb: CallbackQuery):
     filename = os.path.basename(filepath)
     text = f"**⚠️ Are you sure you want to delete this file?**\n\n`{filename}`\n\nThis action cannot be undone."
 
+    # Propagate back_callback
+    execute_cb = f"fm_delete_execute:{filepath}:{back_callback}" if back_callback else f"fm_delete_execute:{filepath}"
+    select_cb = f"fm_select:{filepath}:{back_callback}" if back_callback else f"fm_select:{filepath}"
+    browse_cb = f"fm_browse:{parent_dir}:{back_callback}" if back_callback else f"fm_browse:{parent_dir}"
+
     buttons = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ Yes, Delete It", callback_data=f"fm_delete_execute:{filepath}"),
-            InlineKeyboardButton("❌ No, Cancel", callback_data=f"fm_select:{filepath}")
+            InlineKeyboardButton("✅ Yes, Delete It", callback_data=execute_cb),
+            InlineKeyboardButton("❌ No, Cancel", callback_data=select_cb)
         ],
         [
-            InlineKeyboardButton("🔙 Back to Browser", callback_data=f"fm_browse:{parent_dir}")
+            InlineKeyboardButton("🔙 Back to Browser", callback_data=browse_cb)
         ]
     ])
     await edit_message(cb.message, text, buttons)
@@ -131,7 +138,10 @@ async def fm_delete_execute_cb(c: Client, cb: CallbackQuery):
         return
 
     try:
-        filepath = cb.data.split(":", 1)[1]
+        # Format: fm_delete_execute:filepath:back_callback
+        parts = cb.data.split(":", 2)
+        filepath = parts[1]
+        back_callback = parts[2] if len(parts) > 2 else None
         parent_dir = os.path.dirname(os.path.abspath(filepath))
     except IndexError:
         await cb.answer("Error: Invalid file path in callback.", show_alert=True)
@@ -147,7 +157,5 @@ async def fm_delete_execute_cb(c: Client, cb: CallbackQuery):
         await cb.answer(f"❌ Error deleting file: {e}", show_alert=True)
 
     # Refresh the file browser to show the updated file list
-    text, buttons = await build_file_browser(parent_dir, 0)
-    # Add a close button
-    buttons.append([InlineKeyboardButton("❌ Close", callback_data="close")])
+    text, buttons = await build_file_browser(parent_dir, 0, back_callback)
     await edit_message(cb.message, text, InlineKeyboardMarkup(buttons))
