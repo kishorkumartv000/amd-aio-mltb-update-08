@@ -81,6 +81,7 @@ async def build_file_browser(path: str, page: int = 0, back_callback: str = None
         control_nav.append(InlineKeyboardButton("⬆️ Up", callback_data=f"fm_browse:{parent_path}"))
 
     control_nav.append(InlineKeyboardButton("🔄 Refresh", callback_data=f"fm_browse:{path}:{page}"))
+    control_nav.append(InlineKeyboardButton("❌ Close", callback_data="close"))
     nav_buttons.append(control_nav)
 
     # Add the contextual back button if provided
