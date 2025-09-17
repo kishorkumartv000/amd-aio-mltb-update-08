@@ -1,10 +1,9 @@
 # bot/modules/history.py
-from pyrogram import filters
-from bot.tgclient import aio  # FIXED IMPORT
+from pyrogram import Client, filters
 from bot.helpers.database.pg_impl import download_history
 from bot.helpers.message import send_message
 
-@aio.on_message(filters.command(["history", "downloads"]))
+@Client.on_message(filters.command(["history", "downloads"]))
 async def download_history_handler(client, message):
     user_id = message.from_user.id
     history = download_history.get_user_history(user_id)
