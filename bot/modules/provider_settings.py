@@ -1,6 +1,7 @@
 import bot.helpers.translations as lang
 import asyncio
 
+from . import file_manager_callbacks
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -50,6 +51,47 @@ async def handle_tidal_ng_config_upload(c: Client, msg: Message):
         os.makedirs(target_dir, exist_ok=True)
         os.replace(temp_path, target_path)
         os.chmod(target_path, 0o666)
+        await edit_message(progress_msg, f"✅ **Import Successful!**\nFile `{original_filename}` has been saved to `{target_dir}`.")
+
+    except Exception as e:
+        await edit_message(progress_msg, f"❌ **An Error Occurred:**\n`{str(e)}`")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+        await conversation_state.clear(user_id)
+
+
+# Custom filter to check if a user is in the Apple Music file import state
+async def is_awaiting_apple_music_file_filter(_, __, message: Message):
+    if not message.from_user:
+        return False
+    state = await conversation_state.get(message.from_user.id)
+    return state and state.get('stage') == "awaiting_apple_music_file"
+
+@Client.on_message(filters.document & filters.private & filters.create(is_awaiting_apple_music_file_filter), group=-1)
+async def handle_apple_music_file_upload(c: Client, msg: Message):
+    user_id = msg.from_user.id
+    state = await conversation_state.get(user_id)
+
+    if not msg.document:
+        return
+
+    target_dir = state.get('data', {}).get('target_dir')
+    if not target_dir:
+        await c.send_message(user_id, "❌ An error occurred. The target directory was not set. Please start over.")
+        await conversation_state.clear(user_id)
+        return
+
+    original_filename = msg.document.file_name
+    target_path = os.path.join(target_dir, original_filename)
+
+    progress_msg = await c.send_message(user_id, f"Importing `{original_filename}` to `{target_dir}`...")
+    temp_path = None
+    try:
+        temp_path = await c.download_media(msg)
+        os.makedirs(target_dir, exist_ok=True)
+        os.replace(temp_path, target_path)
+        # No chmod needed for this directory, unlike the tidal-dl-ng config
         await edit_message(progress_msg, f"✅ **Import Successful!**\nFile `{original_filename}` has been saved to `{target_dir}`.")
 
     except Exception as e:
@@ -206,7 +248,8 @@ async def apple_cb(c, cb: CallbackQuery):
             InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
         ])
         buttons.append([
-            InlineKeyboardButton("📂 Manage Files", callback_data="fm_browse:/root/amalac/")
+            InlineKeyboardButton("📂 Manage Files", callback_data="fm_browse:/root/amalac/"),
+            InlineKeyboardButton("📂 Import File", callback_data="appleImportFile")
         ])
         buttons.append([
             InlineKeyboardButton(zip_album_label, callback_data="appleToggleZipAlbum"),
@@ -856,6 +899,23 @@ async def apple_wrapper_setup_cb(c: Client, cb: CallbackQuery):
         # Also clear any other pending flows for safety
         await conversation_state.clear(cb.from_user.id)
         await conversation_state.start(cb.from_user.id, "apple_setup_username", {"chat_id": cb.message.chat.id, "msg_id": cb.message.id})
+
+
+@Client.on_callback_query(filters.regex(pattern=r"^appleImportFile$"))
+async def apple_import_file_cb(c: Client, cb: CallbackQuery):
+    if not await check_user(cb.from_user.id, restricted=True):
+        return
+
+    target_dir = "/root/amalac/"
+    await conversation_state.clear(cb.from_user.id)
+    await conversation_state.start(cb.from_user.id, "awaiting_apple_music_file", {"target_dir": target_dir})
+    await edit_message(
+        cb.message,
+        f"Please upload the file you want to import into `{target_dir}`.\nIt will overwrite any existing file with the same name. You can /cancel anytime.",
+        InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancel", callback_data="appleP")]
+        ])
+    )
 
 
 #----------------
