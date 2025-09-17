@@ -1,7 +1,6 @@
 import bot.helpers.translations as lang
 import asyncio
 
-from . import file_manager_callbacks
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -248,7 +247,7 @@ async def apple_cb(c, cb: CallbackQuery):
             InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
         ])
         buttons.append([
-            InlineKeyboardButton("📂 Manage Files", callback_data="fm_browse:/root/amalac/"),
+            InlineKeyboardButton("📂 Manage Files", callback_data="fm_browse:/root/amalac/:appleP"),
             InlineKeyboardButton("📂 Import File", callback_data="appleImportFile")
         ])
         buttons.append([

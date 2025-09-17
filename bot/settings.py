@@ -115,6 +115,14 @@ class BotSettings:
         self.playlist_zip = _to_bool(__getvalue__('PLAYLIST_ZIP'))
         self.artist_zip = _to_bool(__getvalue__('ARTIST_ZIP'))
 
+        # New: Toggle for using underscores in zip filenames
+        db_safe_zip, _ = set_db.get_variable('ZIP_NAME_USE_UNDERSCORES')
+        if db_safe_zip is None:
+            set_db.set_variable('ZIP_NAME_USE_UNDERSCORES', True)
+            self.zip_name_use_underscores = True
+        else:
+            self.zip_name_use_underscores = _to_bool(db_safe_zip)
+
         # New: telegram video upload type
         video_doc, _ = set_db.get_variable('VIDEO_AS_DOCUMENT')
         self.video_as_document = bool(video_doc) if isinstance(video_doc, bool) else (str(video_doc).lower() == 'true')

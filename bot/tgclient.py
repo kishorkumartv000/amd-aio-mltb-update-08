@@ -5,6 +5,22 @@ from .settings import bot_set
 import subprocess
 import os
 
+# Explicitly import all modules to ensure handlers are registered
+from .modules import (
+    cancel,
+    config_yaml,
+    download,
+    file_manager_callbacks,
+    help,
+    history,
+    provider_settings,
+    settings,
+    start,
+    telegram_setting,
+    tidal_ng_settings,
+)
+
+# The plugins dict is kept for Pyrogram's internal use, but we rely on explicit imports.
 plugins = dict(
     root="bot/modules"
 )

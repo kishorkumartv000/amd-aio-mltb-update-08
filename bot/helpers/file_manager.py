@@ -16,13 +16,14 @@ def get_human_readable_size(size_in_bytes: int) -> str:
             return f"{size_in_bytes:.2f} {unit}"
     return f"{size_in_bytes:.2f} PB"
 
-async def build_file_browser(path: str, page: int = 0) -> tuple[str, list[list[InlineKeyboardButton]]]:
+async def build_file_browser(path: str, page: int = 0, back_callback: str = None) -> tuple[str, list[list[InlineKeyboardButton]]]:
     """
     Builds the text and button layout for a file browser at a given path.
 
     Args:
         path (str): The absolute path of the directory to browse.
         page (int): The page number for pagination.
+        back_callback (str, optional): The callback data for the 'Back' button.
 
     Returns:
         A tuple containing:
@@ -81,6 +82,10 @@ async def build_file_browser(path: str, page: int = 0) -> tuple[str, list[list[I
 
     control_nav.append(InlineKeyboardButton("🔄 Refresh", callback_data=f"fm_browse:{path}:{page}"))
     nav_buttons.append(control_nav)
+
+    # Add the contextual back button if provided
+    if back_callback:
+        nav_buttons.append([InlineKeyboardButton("🔙 Back", callback_data=back_callback)])
 
     buttons.extend(nav_buttons)
 
