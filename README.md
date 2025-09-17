@@ -232,6 +232,20 @@ Commands `/config_get`, `/config_set`, `/config_toggle`, `/config_show` still wo
 
 - A top-of-panel toggle, “Preset Buttons: ON/OFF”, hides the cycling/toggle preset buttons in the Apple panel to prevent accidental config edits. The interactive editor remains available.
 
+### File Management
+
+The Apple Music panel also includes tools for managing the downloader's internal files located in the `/root/amalac/` directory.
+
+-   **`📂 Manage Files`**: Opens an interactive, button-based file browser for the `/root/amalac/` directory.
+    -   Navigate into sub-folders.
+    -   Select a file to get options to **Download** it to your chat or **Delete** it from the server (with confirmation).
+    -   Use the "Up" and "Back" buttons to navigate the file system.
+
+-   **`📂 Import File`**: Allows you to upload a file directly to the `/root/amalac/` directory.
+    -   After tapping the button, the bot will ask you to send a document.
+    -   The uploaded file will be saved in `/root/amalac`.
+    -   If a file with the same name already exists, it will be automatically overwritten.
+
 ## Commands and Usage
 
 These commands work in any chat where the bot is present. Copy-paste directly into Telegram.
@@ -269,6 +283,14 @@ This build is Apple Music–only. Qobuz, Tidal, and Deezer integrations have bee
     ```
 /cancel_all
     ```
+
+### Core Settings Panel
+
+The main settings panel (`/settings`) contains several core toggles that affect the bot's general behavior.
+
+-   **`Safe Zip Names`**: Controls how zip file names are created for all providers.
+    -   **ON (Default):** Replaces spaces in album/playlist titles with underscores (`_`) for better compatibility. E.g., `My Album` -> `My_Album.zip`.
+    -   **OFF:** Keeps original spaces in the filename. E.g., `My Album.zip`.
 
 ### What happens on cancel
 - The bot stops the active step (downloading, zipping, uploading)
