@@ -206,6 +206,9 @@ async def apple_cb(c, cb: CallbackQuery):
             InlineKeyboardButton("⏹️ Stop Wrapper", callback_data="appleStop")
         ])
         buttons.append([
+            InlineKeyboardButton("📂 Manage Files", callback_data="fm_browse:/root/amalac/")
+        ])
+        buttons.append([
             InlineKeyboardButton(zip_album_label, callback_data="appleToggleZipAlbum"),
             InlineKeyboardButton(zip_playlist_label, callback_data="appleToggleZipPlaylist")
         ])
