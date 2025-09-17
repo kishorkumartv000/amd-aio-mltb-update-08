@@ -7,7 +7,6 @@ from pyrogram.types import Message
 from pyrogram.errors import MessageNotModified, FloodWait
 from pyrogram.enums import ParseMode
 
-from bot.tgclient import aio
 from bot.settings import bot_set
 from bot.logger import LOGGER
 
@@ -81,6 +80,7 @@ async def antiSpam(uid=None, cid=None, revoke=False) -> bool:
 
 
 async def send_message(user, item, itype='text', caption=None, markup=None, chat_id=None, meta=None, progress_reporter=None, progress_label=None, file_index=None, total_files=None, cancel_event: asyncio.Event | None = None):
+    from bot.tgclient import aio
     if not isinstance(user, dict):
         user = await fetch_user_details(user)
     chat_id = chat_id if chat_id else user['chat_id']
@@ -210,6 +210,7 @@ async def send_message(user, item, itype='text', caption=None, markup=None, chat
 
 
 async def edit_message(msg:Message, text, markup=None, antiflood=True):
+    from bot.tgclient import aio
     try:
         edited = await msg.edit_text(
             text=text,
