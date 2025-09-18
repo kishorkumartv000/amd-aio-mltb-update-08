@@ -10,10 +10,6 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from ..state import conversation_state
 
 
-async def _get_tidal_ng_base_path(user_id: int) -> str:
-    return os.path.join(Config.LOCAL_STORAGE, str(user_id), "Tidal_NG")
-
-
 def _get_folder_size(folder_path: str) -> int:
     total_size = 0
     for root, _, files in os.walk(folder_path):
@@ -205,8 +201,7 @@ async def _post_manage(user, remote_info: dict):
         LOGGER.error(f"Failed to create rclone manage button: {e}", exc_info=True)
 
 
-async def track_upload(metadata, user, index: int = None, total: int = None):
-    base_path = await _get_tidal_ng_base_path(user['user_id'])
+async def track_upload(metadata, user, base_path: str, index: int = None, total: int = None):
     if bot_set.upload_mode == 'Telegram':
         reporter = user.get('progress')
         if reporter:
@@ -262,8 +257,7 @@ async def track_upload(metadata, user, index: int = None, total: int = None):
             pass
 
 
-async def music_video_upload(metadata, user):
-    base_path = await _get_tidal_ng_base_path(user['user_id'])
+async def music_video_upload(metadata, user, base_path: str):
     if bot_set.upload_mode == 'Telegram':
         send_type = 'doc' if getattr(bot_set, 'video_as_document', False) else 'video'
         await send_message(
@@ -307,8 +301,7 @@ async def music_video_upload(metadata, user):
             pass
 
 
-async def album_upload(metadata, user):
-    base_path = await _get_tidal_ng_base_path(user['user_id'])
+async def album_upload(metadata, user, base_path: str):
     if bot_set.upload_mode == 'Telegram':
         if getattr(bot_set, 'tidal_ng_album_zip', False):
             # Always create a single descriptive zip for Telegram mode
@@ -355,8 +348,7 @@ async def album_upload(metadata, user):
     shutil.rmtree(metadata['folderpath'])
 
 
-async def playlist_upload(metadata, user):
-    base_path = await _get_tidal_ng_base_path(user['user_id'])
+async def playlist_upload(metadata, user, base_path: str):
     if bot_set.upload_mode == 'Telegram':
         if getattr(bot_set, 'tidal_ng_playlist_zip', False):
             zp = await create_tidal_ng_zip(metadata['folderpath'], user['user_id'], metadata)
