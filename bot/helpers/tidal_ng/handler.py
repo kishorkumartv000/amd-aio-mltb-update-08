@@ -129,6 +129,8 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
         # --- Metadata Extraction ---
         items = []
         for file_path in downloaded_files:
+            if file_path.lower().endswith('.lrc'):
+                continue
             try:
                 # Use a combined metadata dictionary for quality and other tags
                 metadata = {}
