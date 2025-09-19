@@ -87,6 +87,11 @@ async def _rclone_upload(user, path, base_path):
     except Exception:
         rel_path = os.path.basename(abs_path)
 
+    # Normalize the relative path to handle cases like "."
+    rel_path = os.path.normpath(rel_path)
+    if rel_path == ".":
+        rel_path = ""
+
     # Correctly determine source and destination for rclone
     # For both files and dirs, we want to copy the item *into* the destination.
     # To preserve the subfolder structure (e.g., "Albums/..."), we should
