@@ -174,12 +174,17 @@ async def _post_manage(user, remote_info: dict):
         rel_path = remote_info.get('path') or ''
         is_dir = bool(remote_info.get('is_dir'))
 
+        # Always set the browser path to the directory containing the media.
+        # If the upload was a directory, that's our path.
+        # If it was a file, we take its parent directory.
         if is_dir:
             src_path = rel_path
             src_file = None
         else:
+            # For single files, we still want the browser to open in their containing folder.
             src_path = os.path.dirname(rel_path)
-            src_file = rel_path
+            # We also pass the filename to potentially select it in the UI later.
+            src_file = os.path.basename(rel_path)
 
         context = {
             'src_remote': remote_info.get('remote'),
