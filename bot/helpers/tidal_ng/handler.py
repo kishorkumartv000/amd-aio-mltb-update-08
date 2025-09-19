@@ -132,7 +132,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
             try:
                 # Use a combined metadata dictionary for quality and other tags
                 metadata = {}
-                if file_path.lower().endswith((".mp4", ".m4v")):
+                if file_path.lower().endswith((".mp4", ".m4v", ".ts")):
                     metadata.update(await extract_video_metadata(file_path))
                 else:
                     metadata.update(await extract_audio_metadata(file_path))
@@ -161,7 +161,7 @@ async def start_tidal_ng(link: str, user: dict, options: dict = None):
                 inferred_type = "playlist"
         elif items:
             # Single item
-            if items[0]["filepath"].lower().endswith((".mp4", ".m4v")):
+            if items[0]["filepath"].lower().endswith((".mp4", ".m4v", ".ts")):
                 inferred_type = "video"
             else:
                 inferred_type = "track"
