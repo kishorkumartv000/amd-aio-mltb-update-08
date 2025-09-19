@@ -330,7 +330,7 @@ async def album_upload(metadata, user, base_path: str):
             tracks = metadata.get('tracks') or metadata.get('items', [])
             total_tracks = len(tracks)
             for idx, track in enumerate(tracks, start=1):
-                await track_upload(track, user, index=idx, total=total_tracks)
+                await track_upload(track, user, base_path, index=idx, total=total_tracks)
     else:
         r_link, i_link, info = await _rclone_upload(user, metadata['folderpath'], base_path)
         text = await format_string(
@@ -374,7 +374,7 @@ async def playlist_upload(metadata, user, base_path: str):
             tracks = metadata.get('tracks') or metadata.get('items', [])
             total_tracks = len(tracks)
             for idx, track in enumerate(tracks, start=1):
-                await track_upload(track, user, index=idx, total=total_tracks)
+                await track_upload(track, user, base_path, index=idx, total=total_tracks)
     else:
         r_link, i_link, info = await _rclone_upload(user, metadata['folderpath'], base_path)
         text = await format_string(
