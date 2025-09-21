@@ -1,0 +1,2 @@
+class TorrentManager:
+    pass
