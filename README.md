@@ -315,6 +315,8 @@ This build is Apple Music–only. Qobuz, Tidal, and Deezer integrations have bee
     ```
 /cancel_all
     ```
+- /clone <gdrive_link>: Copy a file or folder within Google Drive.
+- /count <gdrive_link>: Count the files and folders in a Google Drive path.
 
 ### Core Settings Panel
 
@@ -406,6 +408,8 @@ qqueue - Show your queue (alias)
 qcancel - Cancel a queued item by Queue ID
 cancel - Cancel a running task by ID
 cancel_all - Cancel all your running tasks
+clone - Copy a file/folder in Google Drive
+count - Count files/folders in a Google Drive path
 config - Config help for Apple Music YAML
 config_show - Show config values (or specific keys)
 config_get - Get a single config value

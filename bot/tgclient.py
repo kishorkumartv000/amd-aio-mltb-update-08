@@ -19,6 +19,7 @@ from .modules import (
     telegram_setting,
     tidal_ng_settings,
     uploader_settings,
+    gdrive_commands,
 )
 
 # The plugins dict is kept for Pyrogram's internal use, but we rely on explicit imports.
