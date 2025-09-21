@@ -92,6 +92,20 @@ async def rclone_upload(user, path, name):
     try:
         uploader = RcloneTransferHelper(listener, config_path=rclone_conf_path)
         await uploader.upload(path)
+
+        # After a successful upload, construct remote_info and send the manage button
+        if not listener.is_cancelled:
+            remote_name = rclone_dest.split(':')[0]
+            remote_path = os.path.join(rclone_dest.split(':', 1)[1], name)
+            is_directory = os.path.isdir(path)
+
+            remote_info = {
+                'remote': remote_name,
+                'path': remote_path,
+                'is_dir': is_directory
+            }
+            await _post_rclone_manage_button(user, remote_info)
+
     finally:
         shutil.rmtree(user_temp_path, ignore_errors=True)
 
@@ -231,3 +245,53 @@ async def _get_folder_size(folder_path: str) -> int:
             except Exception:
                 continue
     return total_size
+
+async def _post_rclone_manage_button(user, remote_info: dict):
+    try:
+        from .database.pg_impl import rclone_sessions_db
+        import uuid
+
+        # Generate a unique token for the session
+        token = uuid.uuid4().hex[:10]
+
+        # Prepare the context to be stored in the database
+        src_remote = remote_info.get('remote')
+        rel_path = remote_info.get('path') or ''
+        is_dir = bool(remote_info.get('is_dir'))
+
+        if is_dir:
+            src_path = rel_path
+            src_file = None
+        else:
+            src_path = os.path.dirname(rel_path)
+            src_file = rel_path
+
+        context = {
+            'src_remote': src_remote,
+            'base': remote_info.get('base') if isinstance(remote_info, dict) else None,
+            'src_path': src_path,
+            'src_file': src_file,
+            'dst_remote': None,
+            'dst_path': '',
+            'cc_mode': 'copy',
+            'src_page': 0
+        }
+
+        # Save the session to the database
+        rclone_sessions_db.add_session(
+            token=token,
+            user_id=user['user_id'],
+            context=context
+        )
+
+        # Button to open manage UI, with the token in the callback
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📂 Browse uploaded (Copy/Move)", callback_data=f"rcloneManageStart|{token}")]
+        ])
+        await send_message(user, "Manage the uploaded item:", markup=kb)
+    except Exception as e:
+        try:
+            LOGGER.error(f"Failed to create rclone manage button: {e}", exc_info=True)
+            await send_message(user, "Note: manage button unavailable.")
+        except Exception:
+            pass
