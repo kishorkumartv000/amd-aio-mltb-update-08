@@ -216,6 +216,123 @@ class PostgresRcloneSessionsRepo(AbstractRcloneSessionsRepo):
 
 # --- Main Backend Class ---
 
+class PostgresRssRepo(AbstractRssRepo):
+    def __init__(self, db_handle: DataBaseHandle):
+        self._db = db_handle
+        schema = """
+        CREATE TABLE IF NOT EXISTS rss_feeds (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            feed_name VARCHAR(255) NOT NULL,
+            feed_data JSONB NOT NULL,
+            UNIQUE(user_id, feed_name)
+        );
+        """
+        cur = self._db.scur()
+        try:
+            cur.execute(schema)
+        finally:
+            self._db.ccur(cur)
+
+    def update_feed(self, user_id: int, feed_name: str, feed_data: Dict[str, Any]) -> None:
+        sql = """
+        INSERT INTO rss_feeds (user_id, feed_name, feed_data)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (user_id, feed_name)
+        DO UPDATE SET feed_data = EXCLUDED.feed_data;
+        """
+        cur = self._db.scur()
+        try:
+            cur.execute(sql, (user_id, feed_name, psycopg2.extras.Json(feed_data)))
+        finally:
+            self._db.ccur(cur)
+
+    def get_feed(self, user_id: int, feed_name: str) -> Optional[Dict[str, Any]]:
+        sql = "SELECT feed_data FROM rss_feeds WHERE user_id = %s AND feed_name = %s"
+        cur = self._db.scur(dictcur=True)
+        val = None
+        try:
+            cur.execute(sql, (user_id, feed_name))
+            if cur.rowcount > 0:
+                val = cur.fetchone()['feed_data']
+        finally:
+            self._db.ccur(cur)
+        return val
+
+    def get_all_feeds(self) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM rss_feeds"
+        cur = self._db.scur(dictcur=True)
+        results = []
+        try:
+            cur.execute(sql)
+            results = cur.fetchall()
+        finally:
+            self._db.ccur(cur)
+        return [dict(row) for row in results]
+
+    def delete_feed(self, user_id: int, feed_name: str) -> None:
+        sql = "DELETE FROM rss_feeds WHERE user_id = %s AND feed_name = %s"
+        cur = self._db.scur()
+        try:
+            cur.execute(sql, (user_id, feed_name))
+        finally:
+            self._db.ccur(cur)
+
+class PostgresTasksRepo(AbstractTasksRepo):
+    def __init__(self, db_handle: DataBaseHandle):
+        self._db = db_handle
+        schema = """
+        CREATE TABLE IF NOT EXISTS incomplete_tasks (
+            task_id VARCHAR(255) PRIMARY KEY,
+            chat_id BIGINT NOT NULL,
+            message_id BIGINT NOT NULL,
+            tag VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+        cur = self._db.scur()
+        try:
+            cur.execute(schema)
+        finally:
+            self._db.ccur(cur)
+
+    def add_task(self, task_id: str, chat_id: int, message_id: int, tag: str) -> None:
+        sql = "INSERT INTO incomplete_tasks (task_id, chat_id, message_id, tag) VALUES (%s, %s, %s, %s)"
+        cur = self._db.scur()
+        try:
+            cur.execute(sql, (task_id, chat_id, message_id, tag))
+        finally:
+            self._db.ccur(cur)
+
+    def remove_task(self, task_id: str) -> None:
+        sql = "DELETE FROM incomplete_tasks WHERE task_id = %s"
+        cur = self._db.scur()
+        try:
+            cur.execute(sql, (task_id,))
+        finally:
+            self._db.ccur(cur)
+
+    def get_all_tasks(self) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM incomplete_tasks"
+        cur = self._db.scur(dictcur=True)
+        results = []
+        try:
+            cur.execute(sql)
+            results = cur.fetchall()
+        finally:
+            self._db.ccur(cur)
+        return [dict(row) for row in results]
+
+    def clear_all_tasks(self) -> None:
+        sql = "TRUNCATE TABLE incomplete_tasks"
+        cur = self._db.scur()
+        try:
+            cur.execute(sql)
+        finally:
+            self._db.ccur(cur)
+
+# --- Main Backend Class ---
+
 class PostgresDatabase(DatabaseInterface):
     """PostgreSQL implementation of the database interface."""
 
@@ -233,6 +350,8 @@ class PostgresDatabase(DatabaseInterface):
         self.history = PostgresHistoryRepo(self._db_handle)
         self.user_settings = PostgresUserSettingsRepo(self._db_handle)
         self.rclone_sessions = PostgresRcloneSessionsRepo(self._db_handle)
+        self.rss = PostgresRssRepo(self._db_handle)
+        self.tasks = PostgresTasksRepo(self._db_handle)
 
     def disconnect(self) -> None:
         """Disconnect from the database."""

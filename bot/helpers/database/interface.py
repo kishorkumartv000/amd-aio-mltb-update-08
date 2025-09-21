@@ -51,6 +51,44 @@ class AbstractRcloneSessionsRepo(ABC):
     def delete_session(self, token: str) -> None:
         raise NotImplementedError
 
+class AbstractRssRepo(ABC):
+    """Abstract repository for RSS feed data."""
+
+    @abstractmethod
+    def update_feed(self, user_id: int, feed_name: str, feed_data: Dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_feed(self, user_id: int, feed_name: str) -> Optional[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_all_feeds(self) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_feed(self, user_id: int, feed_name: str) -> None:
+        raise NotImplementedError
+
+class AbstractTasksRepo(ABC):
+    """Abstract repository for incomplete tasks."""
+
+    @abstractmethod
+    def add_task(self, task_id: str, chat_id: int, message_id: int, tag: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_task(self, task_id: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_all_tasks(self) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def clear_all_tasks(self) -> None:
+        raise NotImplementedError
+
 class DatabaseInterface(ABC):
     """Abstract interface for the entire database backend."""
 
@@ -59,6 +97,8 @@ class DatabaseInterface(ABC):
         self.history: AbstractHistoryRepo = None
         self.user_settings: AbstractUserSettingsRepo = None
         self.rclone_sessions: AbstractRcloneSessionsRepo = None
+        self.rss: AbstractRssRepo = None
+        self.tasks: AbstractTasksRepo = None
 
     @abstractmethod
     def connect(self, db_url: str, **kwargs) -> None:

@@ -213,18 +213,20 @@ async def start_apple(link: str, user: dict, options: dict = None):
             await edit_message(user['bot_msg'], f"❌ Unsupported content type: {result['type']}")
             return
         
-        # Final cleanup
-        try:
-            await user['progress'].set_stage("Finalizing")
-        except Exception:
-            pass
-        await cleanup(user)
-        # Clean only the contents of global Apple output folders
-        cleanup_apple_global()
+        # Final cleanup is now handled by user action via buttons
         try:
             await user['progress'].set_stage("Done")
         except Exception:
-            await edit_message(user['bot_msg'], "✅ Apple Music download completed!")
+            pass
+
+        # Create the final message with upload/cleanup options
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("☁️ Upload to Cloud", callback_data=f"mirror_upload|{result['folderpath']}"),
+                InlineKeyboardButton("✅ Done (Delete Files)", callback_data=f"mirror_cleanup|{result['folderpath']}")
+            ]
+        ])
+        await edit_message(user['bot_msg'], "✅ Apple Music download completed!", markup=kb)
         
     except asyncio.CancelledError:
         try:

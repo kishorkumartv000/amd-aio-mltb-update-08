@@ -109,6 +109,52 @@ class MongoRcloneSessionsRepo(AbstractRcloneSessionsRepo):
 
 # --- Main Backend Class ---
 
+class MongoRssRepo(AbstractRssRepo):
+    def __init__(self, db_client: MongoClient, db_name: str):
+        self._collection: Collection = db_client[db_name]["rss_feeds"]
+        self._collection.create_index([("user_id", ASCENDING), ("feed_name", ASCENDING)], unique=True)
+
+    def update_feed(self, user_id: int, feed_name: str, feed_data: Dict[str, Any]) -> None:
+        query = {"user_id": user_id, "feed_name": feed_name}
+        update = {"$set": {"feed_data": feed_data}}
+        self._collection.update_one(query, update, upsert=True)
+
+    def get_feed(self, user_id: int, feed_name: str) -> Optional[Dict[str, Any]]:
+        doc = self._collection.find_one({"user_id": user_id, "feed_name": feed_name})
+        return doc.get("feed_data") if doc else None
+
+    def get_all_feeds(self) -> List[Dict[str, Any]]:
+        return list(self._collection.find({}))
+
+    def delete_feed(self, user_id: int, feed_name: str) -> None:
+        self._collection.delete_one({"user_id": user_id, "feed_name": feed_name})
+
+class MongoTasksRepo(AbstractTasksRepo):
+    def __init__(self, db_client: MongoClient, db_name: str):
+        self._collection: Collection = db_client[db_name]["incomplete_tasks"]
+        self._collection.create_index("task_id", unique=True)
+
+    def add_task(self, task_id: str, chat_id: int, message_id: int, tag: str) -> None:
+        doc = {
+            "task_id": task_id,
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "tag": tag,
+            "created_at": datetime.datetime.now(datetime.timezone.utc)
+        }
+        self._collection.insert_one(doc)
+
+    def remove_task(self, task_id: str) -> None:
+        self._collection.delete_one({"task_id": task_id})
+
+    def get_all_tasks(self) -> List[Dict[str, Any]]:
+        return list(self._collection.find({}))
+
+    def clear_all_tasks(self) -> None:
+        self._collection.delete_many({})
+
+# --- Main Backend Class ---
+
 class MongoDatabase(DatabaseInterface):
     """MongoDB implementation of the database interface."""
 
@@ -145,6 +191,8 @@ class MongoDatabase(DatabaseInterface):
         self.history = MongoHistoryRepo(self._client, self._db_name)
         self.user_settings = MongoUserSettingsRepo(self._client, self._db_name)
         self.rclone_sessions = MongoRcloneSessionsRepo(self._client, self._db_name)
+        self.rss = MongoRssRepo(self._client, self._db_name)
+        self.tasks = MongoTasksRepo(self._client, self._db_name)
 
     def disconnect(self) -> None:
         """Disconnect from the database."""
