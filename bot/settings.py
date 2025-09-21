@@ -165,21 +165,6 @@ class BotSettings:
         """Determine upload mode based on configuration"""
         if os.path.exists('rclone.conf'):
             self.rclone = True
-        elif Config.RCLONE_CONFIG:
-            if Config.RCLONE_CONFIG.startswith('http'):
-                try:
-                    rclone = requests.get(Config.RCLONE_CONFIG, allow_redirects=True)
-                    if rclone.status_code == 200:
-                        with open('rclone.conf', 'wb') as f:
-                            f.write(rclone.content)
-                        self.rclone = True
-                    else:
-                        LOGGER.error(f"Rclone config download failed: HTTP {rclone.status_code}")
-                except Exception as e:
-                    LOGGER.error(f"Rclone config download error: {str(e)}")
-            else:
-                if os.path.exists(Config.RCLONE_CONFIG):
-                    self.rclone = True
         
         db_upload, _ = set_db.get_variable('UPLOAD_MODE')
         if self.rclone and db_upload == 'RCLONE':
