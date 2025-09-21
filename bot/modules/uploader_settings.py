@@ -92,48 +92,68 @@ async def uploader_settings_callbacks(client: Client, callback_query):
         await callback_query.message.reply_text("Send your `token.pickle` file here. This message will be used to identify your reply.")
 
     elif data == "us_rclone":
+        # Get current rclone dest
+        rclone_dest, _ = user_set_db.get_user_setting(callback_query.from_user.id, 'rclone_dest')
+        if not rclone_dest:
+            from config import Config
+            rclone_dest = Config.RCLONE_PATH or "Not Set"
+
         buttons = InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton("⬆️ Upload rclone.conf", callback_data="us_rclone_upload"),
+                    InlineKeyboardButton("✏️ Set Destination", callback_data="us_rclone_set_path"),
                 ],
                 [
                     InlineKeyboardButton("⬅️ Back", callback_data="us_back_main"),
                 ]
             ]
         )
-        await callback_query.message.edit_text("Rclone Settings:", reply_markup=buttons)
+        await callback_query.message.edit_text(f"**Rclone Settings**\n\n**Current Destination:** `{rclone_dest}`", reply_markup=buttons)
 
     elif data == "us_rclone_upload":
         await callback_query.answer("Please reply to my next message with your rclone.conf file.", show_alert=True)
         await callback_query.message.reply_text("Send your `rclone.conf` file here. This message will be used to identify your reply.")
 
+    elif data == "us_rclone_set_path":
+        await callback_query.answer("Please reply to my next message with your rclone destination path.", show_alert=True)
+        await callback_query.message.reply_text("Send your Rclone destination path here (e.g., `my_remote:path/to/folder`). This message will be used to identify your reply.")
+
     else:
         await callback_query.answer("Not implemented yet.", show_alert=True)
 
-@Client.on_message(filters.document & filters.reply)
+@Client.on_message((filters.document | filters.text) & filters.reply)
 async def handle_config_uploads(client: Client, message: Message):
     """
-    Handles the upload of config files like rclone.conf and token.pickle.
+    Handles the upload of config files and setting of text-based configs.
     """
     if not message.reply_to_message or not message.reply_to_message.text:
         return
 
     user_id = message.from_user.id
     reply_text = message.reply_to_message.text
+    is_blob = False
 
     if "rclone.conf" in reply_text:
+        if not message.document: return
         setting_name = "rclone_config"
+        setting_value = (await message.download(in_memory=True)).read()
+        is_blob = True
         success_message = "✅ `rclone.conf` has been saved successfully."
     elif "token.pickle" in reply_text:
+        if not message.document: return
         setting_name = "gdrive_token"
+        setting_value = (await message.download(in_memory=True)).read()
+        is_blob = True
         success_message = "✅ `token.pickle` has been saved successfully."
+    elif "Rclone destination path" in reply_text:
+        if not message.text: return
+        setting_name = "rclone_dest"
+        setting_value = message.text.strip()
+        success_message = f"✅ Rclone destination set to `{setting_value}`."
     else:
         return
 
-    file = await message.download(in_memory=True)
-    file_content = file.read()
-
-    user_set_db.set_user_setting(user_id, setting_name, file_content, is_blob=True)
+    user_set_db.set_user_setting(user_id, setting_name, setting_value, is_blob=is_blob)
 
     await message.reply_text(success_message)
