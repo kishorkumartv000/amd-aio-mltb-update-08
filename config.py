@@ -57,6 +57,7 @@ class Config:
     INDEX_URL         = getenv("INDEX_URL")                                # Optional index base URL
 
     # Rclone Configuration
+    RCLONE_CONFIG     = getenv("RCLONE_CONFIG")                            # Path or URL to rclone.conf
     RCLONE_PATH       = getenv("RCLONE_PATH")                              # Default rclone path
     RCLONE_FLAGS      = getenv("RCLONE_FLAGS")                             # Custom rclone flags
     RCLONE_SERVE_URL  = getenv("RCLONE_SERVE_URL")                         # URL for rclone serve
